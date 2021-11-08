@@ -2,7 +2,6 @@ package main
 
 import (
 	"context"
-	"fmt"
 	"log"
 	"net/http"
 	"os"
@@ -10,25 +9,34 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/Cloudbase-Project/serverless/handlers"
 	"github.com/gorilla/mux"
+	"github.com/joho/godotenv"
 )
 
 func main() {
 
-	PORT := 3000
+	logger := log.New(os.Stdout, "SERVERLESS_SERVER ", log.LstdFlags)
 
-	fmt.Println("hello world")
+	err := godotenv.Load()
+	if err != nil {
+		logger.Fatal("Cannot load env variables")
+	}
 
-	logger := log.New(os.Stdout, "SERVERLESS_SERVER ", log.Flags())
+	PORT, ok := os.LookupEnv("PORT")
+	if !ok {
+		PORT = "3000"
+	}
 
 	router := mux.NewRouter()
 
 	router.HandleFunc("/", func(rw http.ResponseWriter, r *http.Request) {
 		rw.Write([]byte("hello world"))
 	})
+	router.HandleFunc("/code", handlers.CodeHandler).Methods("POST")
 
 	server := http.Server{
-		Addr:    ":" + fmt.Sprint(PORT),
+		Addr:    ":" + PORT,
 		Handler: router,
 	}
 

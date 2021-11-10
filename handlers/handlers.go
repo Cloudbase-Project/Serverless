@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"time"
 
 	"github.com/Cloudbase-Project/serverless/constants"
 	v1 "k8s.io/api/core/v1"
@@ -33,9 +34,9 @@ const (
 
 func CodeHandler(rw http.ResponseWriter, r *http.Request) {
 
-	// 1. authenicate
-	// 2. check if the service is enabled
-	// 3. save code to db
+	// TODO: 1. authenicate
+	// TODO: 2. check if the service is enabled
+	// TODO: 3. save code to db
 
 	body := &PostCodeDTO{}
 
@@ -67,7 +68,7 @@ func CodeHandler(rw http.ResponseWriter, r *http.Request) {
 	// create namespace if not exist
 	namespace, err := clientset.CoreV1().
 		Namespaces().
-		Create(context.Background(), &v1.Namespace{ObjectMeta: metav1.ObjectMeta{Name: "serverless"}}, metav1.CreateOptions{})
+		Create(r.Context(), &v1.Namespace{ObjectMeta: metav1.ObjectMeta{Name: "serverless"}}, metav1.CreateOptions{})
 	if err != nil {
 		// namespace already exists. ignore
 		fmt.Println("namespace already exists. ignore")
@@ -83,13 +84,16 @@ func CodeHandler(rw http.ResponseWriter, r *http.Request) {
 
 	imageTag := Registry + "/" + Project + "/" + ImageName + ":latest"
 
-	pod, err := clientset.CoreV1().Pods("serverless").Create(context.Background(), &v1.Pod{
+	pod, err := clientset.CoreV1().Pods("serverless").Create(r.Context(), &v1.Pod{
 		TypeMeta: metav1.TypeMeta{
 			Kind:       "Pod",
 			APIVersion: "v1",
 		},
 		ObjectMeta: metav1.ObjectMeta{
 			Name: "kaniko-worker",
+			Labels: map[string]string{
+				"builder": "codeId", // the code id
+			},
 		},
 		Spec: v1.PodSpec{
 			InitContainers: []v1.Container{{
@@ -135,5 +139,47 @@ func CodeHandler(rw http.ResponseWriter, r *http.Request) {
 	}, metav1.CreateOptions{})
 
 	// podLogs = clientset.CoreV1().Pods("serverless").GetLogs("kaniko-worker", &v1.PodLogOptions{})
+
+	rw.Write([]byte("Building Image for your code"))
+
+	label := ""
+	for k := range pod.GetLabels() {
+		label = k
+		break
+	}
+
+	// watch for 1 min and then close everything
+	watchContext, cancelFunc := context.WithTimeout(context.Background(), 60*time.Second)
+	defer cancelFunc()
+
+	podWatch, err := clientset.CoreV1().
+		Pods("serverless").
+		Watch(
+			// TODO: Donno if the request context should be used here or a custom timeout context should be used here.
+			// r.Context(),
+			watchContext,
+			metav1.ListOptions{LabelSelector: label})
+
+	go func() {
+		for event := range podWatch.ResultChan() {
+			p, ok := event.Object.(*v1.Pod)
+			if !ok {
+				fmt.Println("unexpected type")
+			}
+			// Check Pod Phase. If its failed or succeeded.
+			switch p.Status.Phase {
+			case v1.PodSucceeded:
+				// TODO: Commit status to DB
+				fmt.Println("image build success. pushed to db")
+				podWatch.Stop()
+				break
+			case v1.PodFailed:
+				// TODO: Commit status to DB with message
+				fmt.Println("Image build failed. Reason : ", p.Status.Message)
+				podWatch.Stop()
+				break
+			}
+		}
+	}()
 
 }

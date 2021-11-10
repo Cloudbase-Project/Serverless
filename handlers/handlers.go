@@ -17,20 +17,13 @@ import (
 
 type PostCodeDTO struct {
 	code     string
-	language Language
+	language constants.Language
 }
 
 func fromJSON(body io.Reader, value interface{}) interface{} {
 	d := json.NewDecoder(body)
 	return d.Decode(value)
 }
-
-type Language string
-
-const (
-	NODEJS Language = "NODEJS"
-	GOLANG Language = "GOLANG"
-)
 
 func CodeHandler(rw http.ResponseWriter, r *http.Request) {
 
@@ -61,7 +54,7 @@ func CodeHandler(rw http.ResponseWriter, r *http.Request) {
 		panic(err)
 	}
 
-	if body.language == NODEJS {
+	if body.language == constants.NODEJS {
 
 	}
 

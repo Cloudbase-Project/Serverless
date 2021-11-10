@@ -25,7 +25,31 @@ func fromJSON(body io.Reader, value interface{}) interface{} {
 	return d.Decode(value)
 }
 
-func CodeHandler(rw http.ResponseWriter, r *http.Request) {
+func ListFunctions(rw http.ResponseWriter, r *http.Request) {
+	http.Error(rw, "Not Implemented", 500)
+}
+
+func UpdateFunction(rw http.ResponseWriter, r *http.Request) {
+	http.Error(rw, "Not Implemented", 500)
+}
+
+func DeleteFunction(rw http.ResponseWriter, r *http.Request) {
+	http.Error(rw, "Not Implemented", 500)
+}
+
+func GetFunction(rw http.ResponseWriter, r *http.Request) {
+	http.Error(rw, "Not Implemented", 500)
+}
+
+func GetFunctionLogs(rw http.ResponseWriter, r *http.Request) {
+	http.Error(rw, "Not Implemented", 500)
+}
+
+func DeployFunction(rw http.ResponseWriter, r *http.Request) {
+	http.Error(rw, "Not Implemented", 500)
+}
+
+func CreateFunction(rw http.ResponseWriter, r *http.Request) {
 
 	// TODO: 1. authenicate
 	// TODO: 2. check if the service is enabled
@@ -40,7 +64,6 @@ func CodeHandler(rw http.ResponseWriter, r *http.Request) {
 
 	/*
 		Build image
-			stream the data to the frontend
 	*/
 
 	// builder := ImageBuilder{}

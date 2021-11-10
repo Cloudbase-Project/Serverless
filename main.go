@@ -33,7 +33,27 @@ func main() {
 	router.HandleFunc("/", func(rw http.ResponseWriter, r *http.Request) {
 		rw.Write([]byte("hello world"))
 	})
-	router.HandleFunc("/code", handlers.CodeHandler).Methods("POST")
+
+	// add function
+	router.HandleFunc("/function", handlers.CreateFunction).Methods(http.MethodPost)
+
+	// list functions
+	router.HandleFunc("/function", handlers.ListFunctions).Methods(http.MethodGet)
+
+	// update function
+	router.HandleFunc("/function/{id}", handlers.UpdateFunction).Methods(http.MethodPatch)
+
+	// delete function
+	router.HandleFunc("/function/{id}", handlers.DeleteFunction).Methods(http.MethodDelete)
+
+	// View a function. View status/replicas RPS etc
+	router.HandleFunc("/function/{id}", handlers.GetFunction).Methods(http.MethodGet)
+
+	// Get logs of a function
+	router.HandleFunc("/function/{id}/logs", handlers.GetFunctionLogs).Methods(http.MethodGet)
+
+	// Create function creates function image. User has to deploy/redeploy for deployments to take effect.
+	router.HandleFunc("/function/{id}/deploy", handlers.DeployFunction).Methods(http.MethodPost)
 
 	server := http.Server{
 		Addr:    ":" + PORT,

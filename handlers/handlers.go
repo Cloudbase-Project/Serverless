@@ -9,8 +9,12 @@ import (
 	"time"
 
 	"github.com/Cloudbase-Project/serverless/constants"
-	v1 "k8s.io/api/core/v1"
+	v1 "k8s.io/api/apps/v1"
+
+	// appsv1 "k8s.io/api/core/v1"
+	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
 )
@@ -46,7 +50,75 @@ func GetFunctionLogs(rw http.ResponseWriter, r *http.Request) {
 }
 
 func DeployFunction(rw http.ResponseWriter, r *http.Request) {
-	http.Error(rw, "Not Implemented", 500)
+	// http.Error(rw, "Not Implemented", 500)
+
+	// TODO: Get function from db.
+	// check if status is complete and only then try to deploy
+
+	config, err := rest.InClusterConfig()
+	if err != nil {
+		panic(err)
+	}
+
+	clientset, err := kubernetes.NewForConfig(config)
+	if err != nil {
+		panic(err)
+	}
+
+	deploymentLabel := map[string]string{"app": "codeId"}
+
+	deployment, err := clientset.AppsV1().
+		Deployments(constants.Namespace).
+		Create(context.Background(),
+			&v1.Deployment{
+				TypeMeta: metav1.TypeMeta{Kind: "Deployment", APIVersion: "apps/v1"},
+				// TODO:
+				ObjectMeta: metav1.ObjectMeta{Name: "codeId"},
+				Spec: v1.DeploymentSpec{
+					Selector: &metav1.LabelSelector{
+						// TODO:
+						MatchLabels: deploymentLabel,
+					},
+					Replicas: 1, // TODO: Have to do more here
+					Template: corev1.PodTemplateSpec{
+						ObjectMeta: metav1.ObjectMeta{Labels: deploymentLabel},
+						Spec: corev1.PodSpec{
+							RestartPolicy: corev1.RestartPolicyAlways,
+							Containers: []corev1.Container{{
+								// TODO:
+								Name:  "codeId",
+								Image: "image name from db", // should be ghcr.io/projectname/codeId:latest
+								Ports: []corev1.ContainerPort{{ContainerPort: 3000}},
+							}},
+						},
+					},
+				},
+			}, metav1.CreateOptions{})
+
+	// create a clusterIP service for the deployment
+
+	service, err := clientset.CoreV1().
+		Services(constants.Namespace).
+		Create(r.Context(), &corev1.Service{
+			TypeMeta: metav1.TypeMeta{Kind: "Service", APIVersion: "v1"},
+			ObjectMeta: metav1.ObjectMeta{
+				Name: "codeid" + "srv",
+			},
+			Spec: corev1.ServiceSpec{
+				Selector: deploymentLabel,
+				Type:     corev1.ServiceTypeClusterIP,
+				Ports: []corev1.ServicePort{
+					{Port: 3000, TargetPort: intstr.FromInt(3000)},
+				},
+			},
+		}, metav1.CreateOptions{})
+
+	// TODO: Update status in db
+	// TODO: Watch status and update in db
+	// TODO: register with the custom router
+
+	rw.Write([]byte("Deploying your system."))
+
 }
 
 func CreateFunction(rw http.ResponseWriter, r *http.Request) {
@@ -84,7 +156,7 @@ func CreateFunction(rw http.ResponseWriter, r *http.Request) {
 	// create namespace if not exist
 	namespace, err := clientset.CoreV1().
 		Namespaces().
-		Create(r.Context(), &v1.Namespace{ObjectMeta: metav1.ObjectMeta{Name: "serverless"}}, metav1.CreateOptions{})
+		Create(r.Context(), &corev1.Namespace{ObjectMeta: metav1.ObjectMeta{Name: constants.Namespace}}, metav1.CreateOptions{})
 	if err != nil {
 		// namespace already exists. ignore
 		fmt.Println("namespace already exists. ignore")
@@ -94,13 +166,14 @@ func CreateFunction(rw http.ResponseWriter, r *http.Request) {
 
 	// create kaniko pod
 
+	// TODO: get these from env variables
 	Registry := "ghcr.io"
 	Project := ""
 	ImageName := "uhquehqweoiqjeoqiwwhqodiqejd" // Code id
 
 	imageTag := Registry + "/" + Project + "/" + ImageName + ":latest"
 
-	pod, err := clientset.CoreV1().Pods("serverless").Create(r.Context(), &v1.Pod{
+	pod, err := clientset.CoreV1().Pods(constants.Namespace).Create(r.Context(), &corev1.Pod{
 		TypeMeta: metav1.TypeMeta{
 			Kind:       "Pod",
 			APIVersion: "v1",
@@ -111,8 +184,8 @@ func CreateFunction(rw http.ResponseWriter, r *http.Request) {
 				"builder": "codeId", // the code id
 			},
 		},
-		Spec: v1.PodSpec{
-			InitContainers: []v1.Container{{
+		Spec: corev1.PodSpec{
+			InitContainers: []corev1.Container{{
 				Name:  "setup-kaniko",
 				Image: "yauritux/busybox-curl",
 				Command: []string{
@@ -120,7 +193,7 @@ func CreateFunction(rw http.ResponseWriter, r *http.Request) {
 					"-c",
 					"curl -XGET http://cloudbase-serverless-srv.default:3000/worker/queue -o /workspace/index.js && echo -e " + constants.NodejsDockerfile + " >> /workspace/Dockerfile && echo -e " + constants.NodejsPackageJSON + " >> /workspace/package.json && echo -e " + constants.RegistryCredentials + " >> /kaniko/.docker/config.json ",
 				},
-				VolumeMounts: []v1.VolumeMount{{
+				VolumeMounts: []corev1.VolumeMount{{
 					Name:      "shared",
 					MountPath: "/workspace",
 				}, {
@@ -128,7 +201,7 @@ func CreateFunction(rw http.ResponseWriter, r *http.Request) {
 					MountPath: "/kaniko/.docker",
 				}},
 			}},
-			Containers: []v1.Container{{
+			Containers: []corev1.Container{{
 				Name:  "kaniko-executor",
 				Image: "gcr.io/kaniko-project/executor:latest",
 				Args: []string{
@@ -137,7 +210,7 @@ func CreateFunction(rw http.ResponseWriter, r *http.Request) {
 					// "--no-push",
 					"--destination=" + imageTag,
 				},
-				VolumeMounts: []v1.VolumeMount{{
+				VolumeMounts: []corev1.VolumeMount{{
 					Name:      "shared",
 					MountPath: "/workspace",
 				}, {
@@ -145,11 +218,11 @@ func CreateFunction(rw http.ResponseWriter, r *http.Request) {
 					MountPath: "/kaniko/.docker",
 				}},
 			}},
-			RestartPolicy: v1.RestartPolicyNever,
-			Volumes: []v1.Volume{{
-				Name: "shared", VolumeSource: v1.VolumeSource{EmptyDir: &v1.EmptyDirVolumeSource{}},
+			RestartPolicy: corev1.RestartPolicyNever,
+			Volumes: []corev1.Volume{{
+				Name: "shared", VolumeSource: corev1.VolumeSource{EmptyDir: &corev1.EmptyDirVolumeSource{}},
 			}, {
-				Name: "dockerConfig", VolumeSource: v1.VolumeSource{EmptyDir: &v1.EmptyDirVolumeSource{}},
+				Name: "dockerConfig", VolumeSource: corev1.VolumeSource{EmptyDir: &corev1.EmptyDirVolumeSource{}},
 			}},
 		},
 	}, metav1.CreateOptions{})
@@ -169,7 +242,7 @@ func CreateFunction(rw http.ResponseWriter, r *http.Request) {
 	defer cancelFunc()
 
 	podWatch, err := clientset.CoreV1().
-		Pods("serverless").
+		Pods(constants.Namespace).
 		Watch(
 			// TODO: Donno if the request context should be used here or a custom timeout context should be used here.
 			// r.Context(),
@@ -178,18 +251,18 @@ func CreateFunction(rw http.ResponseWriter, r *http.Request) {
 
 	go func() {
 		for event := range podWatch.ResultChan() {
-			p, ok := event.Object.(*v1.Pod)
+			p, ok := event.Object.(*corev1.Pod)
 			if !ok {
 				fmt.Println("unexpected type")
 			}
 			// Check Pod Phase. If its failed or succeeded.
 			switch p.Status.Phase {
-			case v1.PodSucceeded:
+			case corev1.PodSucceeded:
 				// TODO: Commit status to DB
 				fmt.Println("image build success. pushed to db")
 				podWatch.Stop()
 				break
-			case v1.PodFailed:
+			case corev1.PodFailed:
 				// TODO: Commit status to DB with message
 				fmt.Println("Image build failed. Reason : ", p.Status.Message)
 				podWatch.Stop()

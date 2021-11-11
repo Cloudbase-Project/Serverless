@@ -149,29 +149,12 @@ func (f *Function) CreateFunction(rw http.ResponseWriter, r *http.Request) {
 		http.Error(rw, "cannot read json", 400)
 	}
 
-	/*
-		Build image
-	*/
-
-	// builder := ImageBuilder{}
-	// config, err := rest.InClusterConfig()
-	// if err != nil {
-	// 	panic(err)
-	// }
-
-	// clientset, err := kubernetes.NewForConfig(config)
-	// if err != nil {
-	// 	panic(err)
-	// }
-
-	if body.language == constants.NODEJS {
-
-	}
-
 	// TODO: get these from env variables
 	Registry := "ghcr.io"
 	Project := ""
 	ImageName := "uhquehqweoiqjeoqiwwhqodiqejd" // Code id
+
+	imageTag := Registry + "/" + Project + "/" + ImageName + ":latest"
 
 	namespace, err := f.kw.CreateNamespace(r.Context(), constants.Namespace)
 
@@ -185,85 +168,25 @@ func (f *Function) CreateFunction(rw http.ResponseWriter, r *http.Request) {
 
 	// create kaniko pod
 
-	imageTag := Registry + "/" + Project + "/" + ImageName + ":latest"
-
-	// pod, err := f.kw.NewImageBuilder()
-
-	pod, err := f.kw.KClient.CoreV1().Pods(constants.Namespace).Create(r.Context(), &corev1.Pod{
-		TypeMeta: metav1.TypeMeta{
-			Kind:       "Pod",
-			APIVersion: "v1",
-		},
-		ObjectMeta: metav1.ObjectMeta{
-			Name: "kaniko-worker",
-			Labels: map[string]string{
-				"builder": "codeId", // the code id
-			},
-		},
-		Spec: corev1.PodSpec{
-			InitContainers: []corev1.Container{{
-				Name:  "setup-kaniko",
-				Image: "yauritux/busybox-curl",
-				Command: []string{
-					"/bin/sh",
-					"-c",
-					"curl -XGET http://cloudbase-serverless-srv.default:3000/worker/queue -o /workspace/index.js && echo -e " + constants.NodejsDockerfile + " >> /workspace/Dockerfile && echo -e " + constants.NodejsPackageJSON + " >> /workspace/package.json && echo -e " + constants.RegistryCredentials + " >> /kaniko/.docker/config.json ",
-				},
-				VolumeMounts: []corev1.VolumeMount{{
-					Name:      "shared",
-					MountPath: "/workspace",
-				}, {
-					Name:      "dockerConfig",
-					MountPath: "/kaniko/.docker",
-				}},
-			}},
-			Containers: []corev1.Container{{
-				Name:  "kaniko-executor",
-				Image: "gcr.io/kaniko-project/executor:latest",
-				Args: []string{
-					"--dockerfile=/workspace/Dockerfile",
-					"--context=dir:///workspace",
-					// "--no-push",
-					"--destination=" + imageTag,
-				},
-				VolumeMounts: []corev1.VolumeMount{{
-					Name:      "shared",
-					MountPath: "/workspace",
-				}, {
-					Name:      "dockerConfig",
-					MountPath: "/kaniko/.docker",
-				}},
-			}},
-			RestartPolicy: corev1.RestartPolicyNever,
-			Volumes: []corev1.Volume{{
-				Name: "shared", VolumeSource: corev1.VolumeSource{EmptyDir: &corev1.EmptyDirVolumeSource{}},
-			}, {
-				Name: "dockerConfig", VolumeSource: corev1.VolumeSource{EmptyDir: &corev1.EmptyDirVolumeSource{}},
-			}},
-		},
-	}, metav1.CreateOptions{})
+	pod, err := f.kw.CreateImageBuilder(
+		&kuberneteswrapper.ImageBuilder{
+			Ctx:        r.Context(),
+			Namespace:  constants.Namespace,
+			FunctionId: "aweqwe",         // TODO:
+			Language:   constants.NODEJS, // TODO:
+			ImageTag:   imageTag,
+		})
 
 	// podLogs = clientset.CoreV1().Pods("serverless").GetLogs("kaniko-worker", &v1.PodLogOptions{})
 
 	rw.Write([]byte("Building Image for your code"))
 
-	label := ""
-	for k := range pod.GetLabels() {
-		label = k
-		break
-	}
-
 	// watch for 1 min and then close everything
 	watchContext, cancelFunc := context.WithTimeout(context.Background(), 60*time.Second)
 	defer cancelFunc()
 
-	podWatch, err := f.kw.KClient.CoreV1().
-		Pods(constants.Namespace).
-		Watch(
-			// TODO: Donno if the request context should be used here or a custom timeout context should be used here.
-			// r.Context(),
-			watchContext,
-			metav1.ListOptions{LabelSelector: label})
+	label, err := f.kw.BuildLabel("builder", []string{"codeID"}) // TODO:
+	podWatch, err := f.kw.WatchImageBuilder(watchContext, label.String())
 
 	go func() {
 		for event := range podWatch.ResultChan() {

@@ -1,13 +1,15 @@
-package handlers
+package function
 
 import (
 	"context"
 	"encoding/json"
 	"fmt"
 	"io"
+	"log"
 	"net/http"
 	"time"
 
+	kuberneteswrapper "github.com/Cloudbase-Project/serverless/KubernetesWrapper"
 	"github.com/Cloudbase-Project/serverless/constants"
 	v1 "k8s.io/api/apps/v1"
 
@@ -24,32 +26,42 @@ type PostCodeDTO struct {
 	language constants.Language
 }
 
+type Function struct {
+	l  *log.Logger
+	kw *kuberneteswrapper.KubernetesWrapper
+}
+
+func NewFunction(client *kubernetes.Clientset, l *log.Logger) *Function {
+	kw := kuberneteswrapper.NewWrapper(client)
+	return &Function{l: l, kw: kw}
+}
+
 func fromJSON(body io.Reader, value interface{}) interface{} {
 	d := json.NewDecoder(body)
 	return d.Decode(value)
 }
 
-func ListFunctions(rw http.ResponseWriter, r *http.Request) {
+func (f *Function) ListFunctions(rw http.ResponseWriter, r *http.Request) {
 	http.Error(rw, "Not Implemented", 500)
 }
 
-func UpdateFunction(rw http.ResponseWriter, r *http.Request) {
+func (f *Function) UpdateFunction(rw http.ResponseWriter, r *http.Request) {
 	http.Error(rw, "Not Implemented", 500)
 }
 
-func DeleteFunction(rw http.ResponseWriter, r *http.Request) {
+func (f *Function) DeleteFunction(rw http.ResponseWriter, r *http.Request) {
 	http.Error(rw, "Not Implemented", 500)
 }
 
-func GetFunction(rw http.ResponseWriter, r *http.Request) {
+func (f *Function) GetFunction(rw http.ResponseWriter, r *http.Request) {
 	http.Error(rw, "Not Implemented", 500)
 }
 
-func GetFunctionLogs(rw http.ResponseWriter, r *http.Request) {
+func (f *Function) GetFunctionLogs(rw http.ResponseWriter, r *http.Request) {
 	http.Error(rw, "Not Implemented", 500)
 }
 
-func DeployFunction(rw http.ResponseWriter, r *http.Request) {
+func (f *Function) DeployFunction(rw http.ResponseWriter, r *http.Request) {
 	// http.Error(rw, "Not Implemented", 500)
 
 	// TODO: Get function from db.
@@ -67,6 +79,9 @@ func DeployFunction(rw http.ResponseWriter, r *http.Request) {
 
 	deploymentLabel := map[string]string{"app": "codeId"}
 
+	var replicas int32
+	replicas = 1
+
 	deployment, err := clientset.AppsV1().
 		Deployments(constants.Namespace).
 		Create(context.Background(),
@@ -79,7 +94,7 @@ func DeployFunction(rw http.ResponseWriter, r *http.Request) {
 						// TODO:
 						MatchLabels: deploymentLabel,
 					},
-					Replicas: 1, // TODO: Have to do more here
+					Replicas: &replicas, // TODO: Have to do more here
 					Template: corev1.PodTemplateSpec{
 						ObjectMeta: metav1.ObjectMeta{Labels: deploymentLabel},
 						Spec: corev1.PodSpec{
@@ -121,7 +136,7 @@ func DeployFunction(rw http.ResponseWriter, r *http.Request) {
 
 }
 
-func CreateFunction(rw http.ResponseWriter, r *http.Request) {
+func (f *Function) CreateFunction(rw http.ResponseWriter, r *http.Request) {
 
 	// TODO: 1. authenicate
 	// TODO: 2. check if the service is enabled
@@ -139,24 +154,28 @@ func CreateFunction(rw http.ResponseWriter, r *http.Request) {
 	*/
 
 	// builder := ImageBuilder{}
-	config, err := rest.InClusterConfig()
-	if err != nil {
-		panic(err)
-	}
+	// config, err := rest.InClusterConfig()
+	// if err != nil {
+	// 	panic(err)
+	// }
 
-	clientset, err := kubernetes.NewForConfig(config)
-	if err != nil {
-		panic(err)
-	}
+	// clientset, err := kubernetes.NewForConfig(config)
+	// if err != nil {
+	// 	panic(err)
+	// }
 
 	if body.language == constants.NODEJS {
 
 	}
 
+	// TODO: get these from env variables
+	Registry := "ghcr.io"
+	Project := ""
+	ImageName := "uhquehqweoiqjeoqiwwhqodiqejd" // Code id
+
+	namespace, err := f.kw.CreateNamespace(r.Context(), constants.Namespace)
+
 	// create namespace if not exist
-	namespace, err := clientset.CoreV1().
-		Namespaces().
-		Create(r.Context(), &corev1.Namespace{ObjectMeta: metav1.ObjectMeta{Name: constants.Namespace}}, metav1.CreateOptions{})
 	if err != nil {
 		// namespace already exists. ignore
 		fmt.Println("namespace already exists. ignore")
@@ -166,14 +185,11 @@ func CreateFunction(rw http.ResponseWriter, r *http.Request) {
 
 	// create kaniko pod
 
-	// TODO: get these from env variables
-	Registry := "ghcr.io"
-	Project := ""
-	ImageName := "uhquehqweoiqjeoqiwwhqodiqejd" // Code id
-
 	imageTag := Registry + "/" + Project + "/" + ImageName + ":latest"
 
-	pod, err := clientset.CoreV1().Pods(constants.Namespace).Create(r.Context(), &corev1.Pod{
+	// pod, err := f.kw.NewImageBuilder()
+
+	pod, err := f.kw.KClient.CoreV1().Pods(constants.Namespace).Create(r.Context(), &corev1.Pod{
 		TypeMeta: metav1.TypeMeta{
 			Kind:       "Pod",
 			APIVersion: "v1",
@@ -241,7 +257,7 @@ func CreateFunction(rw http.ResponseWriter, r *http.Request) {
 	watchContext, cancelFunc := context.WithTimeout(context.Background(), 60*time.Second)
 	defer cancelFunc()
 
-	podWatch, err := clientset.CoreV1().
+	podWatch, err := f.kw.KClient.CoreV1().
 		Pods(constants.Namespace).
 		Watch(
 			// TODO: Donno if the request context should be used here or a custom timeout context should be used here.

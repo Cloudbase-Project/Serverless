@@ -9,9 +9,11 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/Cloudbase-Project/serverless/handlers"
+	Function "github.com/Cloudbase-Project/serverless/function"
 	"github.com/gorilla/mux"
 	"github.com/joho/godotenv"
+	"k8s.io/client-go/kubernetes"
+	"k8s.io/client-go/rest"
 )
 
 func main() {
@@ -34,26 +36,38 @@ func main() {
 		rw.Write([]byte("hello world"))
 	})
 
+	config, err := rest.InClusterConfig()
+	if err != nil {
+		panic(err)
+	}
+
+	clientset, err := kubernetes.NewForConfig(config)
+	if err != nil {
+		panic(err)
+	}
+
+	function := Function.NewFunction(clientset, logger)
+
 	// add function
-	router.HandleFunc("/function", handlers.CreateFunction).Methods(http.MethodPost)
+	router.HandleFunc("/function", function.CreateFunction).Methods(http.MethodPost)
 
 	// list functions
-	router.HandleFunc("/function", handlers.ListFunctions).Methods(http.MethodGet)
+	router.HandleFunc("/function", function.ListFunctions).Methods(http.MethodGet)
 
 	// update function
-	router.HandleFunc("/function/{id}", handlers.UpdateFunction).Methods(http.MethodPatch)
+	router.HandleFunc("/function/{id}", function.UpdateFunction).Methods(http.MethodPatch)
 
 	// delete function
-	router.HandleFunc("/function/{id}", handlers.DeleteFunction).Methods(http.MethodDelete)
+	router.HandleFunc("/function/{id}", function.DeleteFunction).Methods(http.MethodDelete)
 
 	// View a function. View status/replicas RPS etc
-	router.HandleFunc("/function/{id}", handlers.GetFunction).Methods(http.MethodGet)
+	router.HandleFunc("/function/{id}", function.GetFunction).Methods(http.MethodGet)
 
 	// Get logs of a function
-	router.HandleFunc("/function/{id}/logs", handlers.GetFunctionLogs).Methods(http.MethodGet)
+	router.HandleFunc("/function/{id}/logs", function.GetFunctionLogs).Methods(http.MethodGet)
 
 	// Create function creates function image. User has to deploy/redeploy for deployments to take effect.
-	router.HandleFunc("/function/{id}/deploy", handlers.DeployFunction).Methods(http.MethodPost)
+	router.HandleFunc("/function/{id}/deploy", function.DeployFunction).Methods(http.MethodPost)
 
 	server := http.Server{
 		Addr:    ":" + PORT,

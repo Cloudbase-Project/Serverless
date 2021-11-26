@@ -7,10 +7,12 @@ import (
 	"k8s.io/client-go/kubernetes"
 
 	// appsv1 "k8s.io/api/core/v1"
+	v1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/selection"
+	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/apimachinery/pkg/watch"
 )
 
@@ -23,7 +25,23 @@ type ImageBuilder struct {
 	Namespace  string
 	FunctionId string
 	Language   constants.Language
-	ImageTag   string
+	ImageName  string
+}
+
+type DeploymentOptions struct {
+	Ctx             context.Context
+	Namespace       string
+	FunctionId      string
+	DeploymentLabel map[string]string
+	ImageName       string
+	Replicas        int32
+}
+
+type ServiceOptions struct {
+	Ctx             context.Context
+	Namespace       string
+	FunctionId      string
+	DeploymentLabel map[string]string
 }
 
 func NewWrapper(client *kubernetes.Clientset) *KubernetesWrapper {
@@ -93,7 +111,7 @@ func (kw *KubernetesWrapper) CreateImageBuilder(ib *ImageBuilder) (*corev1.Pod, 
 					"--dockerfile=/workspace/Dockerfile",
 					"--context=dir:///workspace",
 					// "--no-push",
-					"--destination=" + ib.ImageTag,
+					"--destination=" + ib.ImageName,
 				},
 				VolumeMounts: []corev1.VolumeMount{{
 					Name:      "shared",
@@ -125,6 +143,51 @@ func (kw *KubernetesWrapper) CreateNamespace(
 
 }
 
-func (kw *KubernetesWrapper) CreateDeployment(ctx context.Context, namespace string) {}
+func (kw *KubernetesWrapper) CreateDeployment(options *DeploymentOptions) (*v1.Deployment, error) {
 
-func (kw *KubernetesWrapper) CreateService(ctx context.Context, namespace string) {}
+	return kw.KClient.AppsV1().
+		Deployments(options.Namespace).
+		Create(options.Ctx,
+			&v1.Deployment{
+				TypeMeta: metav1.TypeMeta{Kind: "Deployment", APIVersion: "apps/v1"},
+				// TODO:
+				ObjectMeta: metav1.ObjectMeta{Name: options.FunctionId},
+				Spec: v1.DeploymentSpec{
+					Selector: &metav1.LabelSelector{
+						// TODO:
+						MatchLabels: options.DeploymentLabel,
+					},
+					Replicas: &options.Replicas, // TODO: Have to do more here
+					Template: corev1.PodTemplateSpec{
+						ObjectMeta: metav1.ObjectMeta{Labels: options.DeploymentLabel},
+						Spec: corev1.PodSpec{
+							RestartPolicy: corev1.RestartPolicyAlways,
+							Containers: []corev1.Container{{
+								// TODO:
+								Name:  options.FunctionId,
+								Image: options.ImageName, // "image name from db", // should be ghcr.io/projectname/codeId:latest
+								Ports: []corev1.ContainerPort{{ContainerPort: 3000}},
+							}},
+						},
+					},
+				},
+			}, metav1.CreateOptions{})
+}
+
+func (kw *KubernetesWrapper) CreateService(options *ServiceOptions) (*corev1.Service, error) {
+	return kw.KClient.CoreV1().
+		Services(options.Namespace).
+		Create(options.Ctx, &corev1.Service{
+			TypeMeta: metav1.TypeMeta{Kind: "Service", APIVersion: "v1"},
+			ObjectMeta: metav1.ObjectMeta{
+				Name: options.FunctionId + " srv",
+			},
+			Spec: corev1.ServiceSpec{
+				Selector: options.DeploymentLabel,
+				Type:     corev1.ServiceTypeClusterIP,
+				Ports: []corev1.ServicePort{
+					{Port: 3000, TargetPort: intstr.FromInt(3000)},
+				},
+			},
+		}, metav1.CreateOptions{})
+}

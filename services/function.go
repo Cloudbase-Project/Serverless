@@ -1,6 +1,8 @@
 package services
 
 import (
+	"errors"
+
 	"github.com/Cloudbase-Project/serverless/models"
 	"gorm.io/gorm"
 )
@@ -22,5 +24,16 @@ func (fs *FunctionService) GetAllFunctions() (*models.Functions, error) {
 	}
 
 	return &functions, nil
+}
 
+func (fs *FunctionService) GetFunction(codeId string) (*models.Function, error) {
+	var function models.Function
+	if err := fs.db.First(&function, "id = ?", codeId).Error; err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, nil
+		} else {
+			return nil, err
+		}
+	}
+	return &function, nil
 }

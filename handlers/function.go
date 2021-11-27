@@ -12,6 +12,7 @@ import (
 	kuberneteswrapper "github.com/Cloudbase-Project/serverless/KubernetesWrapper"
 	"github.com/Cloudbase-Project/serverless/constants"
 	"github.com/Cloudbase-Project/serverless/services"
+	"github.com/gorilla/mux"
 
 	// appsv1 "k8s.io/api/core/v1"
 	corev1 "k8s.io/api/core/v1"
@@ -29,6 +30,7 @@ type FunctionHandler struct {
 	kw      *kuberneteswrapper.KubernetesWrapper
 }
 
+// create new function
 func NewFunctionHandler(
 	client *kubernetes.Clientset,
 	l *log.Logger,
@@ -48,16 +50,29 @@ func (f *FunctionHandler) ListFunctions(rw http.ResponseWriter, r *http.Request)
 
 	functions, err := f.service.GetAllFunctions()
 	if err != nil {
-		http.Error(rw, "DB error", 400)
+		http.Error(rw, "DB error", 500)
 	}
 
 	err = functions.ToJSON(rw)
 	if err != nil {
 		http.Error(rw, "Unable to marshal JSON", http.StatusInternalServerError)
 	}
+}
 
-	json.NewEncoder(rw).Encode(functions)
+// Get a function given a "codeId" in the route params
+func (f *FunctionHandler) GetFunction(rw http.ResponseWriter, r *http.Request) {
 
+	vars := mux.Vars(r)
+
+	function, err := f.service.GetFunction(vars["codeId"])
+	if err != nil {
+		http.Error(rw, "DB error", 500)
+	}
+
+	err = function.ToJSON(rw)
+	if err != nil {
+		http.Error(rw, "Unable to marshal JSON", http.StatusInternalServerError)
+	}
 }
 
 func (f *FunctionHandler) UpdateFunction(rw http.ResponseWriter, r *http.Request) {
@@ -65,10 +80,6 @@ func (f *FunctionHandler) UpdateFunction(rw http.ResponseWriter, r *http.Request
 }
 
 func (f *FunctionHandler) DeleteFunction(rw http.ResponseWriter, r *http.Request) {
-	http.Error(rw, "Not Implemented", 500)
-}
-
-func (f *FunctionHandler) GetFunction(rw http.ResponseWriter, r *http.Request) {
 	http.Error(rw, "Not Implemented", 500)
 }
 

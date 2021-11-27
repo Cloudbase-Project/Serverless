@@ -9,11 +9,16 @@ import (
 	"syscall"
 	"time"
 
-	Function "github.com/Cloudbase-Project/serverless/function"
 	"github.com/gorilla/mux"
 	"github.com/joho/godotenv"
+	"gorm.io/driver/postgres"
+	"gorm.io/gorm"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
+
+	"github.com/Cloudbase-Project/serverless/handlers"
+	"github.com/Cloudbase-Project/serverless/models"
+	"github.com/Cloudbase-Project/serverless/services"
 )
 
 func main() {
@@ -46,12 +51,24 @@ func main() {
 		panic(err)
 	}
 
-	function := Function.NewFunction(clientset, logger)
+	dsn := "host=localhost user=gorm password=gorm dbname=gorm port=9920 sslmode=disable TimeZone=Asia/Shanghai"
+	db, err := gorm.Open(postgres.Open(dsn), &gorm.Config{})
+	if err != nil {
+		panic("failed to connect database")
+	}
+
+	logger.Print("Connected to DB")
+
+	db.AutoMigrate(&models.Function{})
+
+	fs := services.NewFunctionService(db)
+
+	function := handlers.NewFunctionHandler(clientset, logger, fs)
 
 	// add function
 	router.HandleFunc("/function", function.CreateFunction).Methods(http.MethodPost)
 
-	// list functions
+	// list functions created by the user
 	router.HandleFunc("/function", function.ListFunctions).Methods(http.MethodGet)
 
 	// update function
@@ -85,7 +102,7 @@ func main() {
 	}()
 
 	<-c
-	logger.Println("received signal. terminating")
+	logger.Println("received signal. terminating...")
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
 

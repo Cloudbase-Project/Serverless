@@ -69,22 +69,22 @@ func main() {
 	router.HandleFunc("/function", function.CreateFunction).Methods(http.MethodPost)
 
 	// list functions created by the user
-	router.HandleFunc("/function", function.ListFunctions).Methods(http.MethodGet)
+	router.HandleFunc("/functions", function.ListFunctions).Methods(http.MethodGet)
 
 	// update function
-	router.HandleFunc("/function/{id}", function.UpdateFunction).Methods(http.MethodPatch)
+	router.HandleFunc("/function/{codeId}", function.UpdateFunction).Methods(http.MethodPatch)
 
 	// delete function
-	router.HandleFunc("/function/{id}", function.DeleteFunction).Methods(http.MethodDelete)
+	router.HandleFunc("/function/{codeId}", function.DeleteFunction).Methods(http.MethodDelete)
 
 	// View a function. View status/replicas RPS etc
-	router.HandleFunc("/function/{id}", function.GetFunction).Methods(http.MethodGet)
+	router.HandleFunc("/function/{codeId}", function.GetFunction).Methods(http.MethodGet)
 
 	// Get logs of a function
-	router.HandleFunc("/function/{id}/logs", function.GetFunctionLogs).Methods(http.MethodGet)
+	router.HandleFunc("/function/{codeId}/logs", function.GetFunctionLogs).Methods(http.MethodGet)
 
 	// Create function creates function image. User has to deploy/redeploy for deployments to take effect.
-	router.HandleFunc("/function/{id}/deploy", function.DeployFunction).Methods(http.MethodPost)
+	router.HandleFunc("/function/{codeId}/deploy", function.DeployFunction).Methods(http.MethodPost)
 
 	server := http.Server{
 		Addr:    ":" + PORT,

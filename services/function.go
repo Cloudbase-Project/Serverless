@@ -3,6 +3,7 @@ package services
 import (
 	"errors"
 
+	"github.com/Cloudbase-Project/serverless/constants"
 	"github.com/Cloudbase-Project/serverless/models"
 	"gorm.io/gorm"
 )
@@ -36,4 +37,31 @@ func (fs *FunctionService) GetFunction(codeId string) (*models.Function, error) 
 		}
 	}
 	return &function, nil
+}
+
+func (fs *FunctionService) CreateFunction(
+	code string,
+	language constants.Language,
+	userId string,
+) (*models.Function, error) {
+
+	var function models.Function
+	if err := fs.db.Create(&models.Function{Code: code, Language: string(language), UserId: userId}).Error; err != nil {
+		return nil, err
+	}
+	return &function, nil
+}
+
+type UpdateBuildStatusOptions struct {
+	Function *models.Function
+	Status   string
+	Reason   *string
+}
+
+func (fs *FunctionService) UpdateBuildStatus(data UpdateBuildStatusOptions) {
+	data.Function.BuildStatus = data.Status
+	if data.Reason != nil {
+		data.Function.FailReason = *data.Reason
+	}
+	fs.db.Save(data.Function)
 }

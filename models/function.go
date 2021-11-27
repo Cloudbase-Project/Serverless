@@ -9,14 +9,19 @@ import (
 	"gorm.io/gorm"
 )
 
+// Array of functions
 type Functions []*Function
 
 type Function struct {
-	ID        uuid.UUID      `gorm:"type:uuid;default:uuid_generate_v4();primaryKey" json:"asdid"`
-	CreatedAt time.Time      `json:"-"`
-	UserId    string         `json:"userId" validate` // user table is controlled by cloudbase-main
-	UpdatedAt time.Time      `json:"-"`
-	DeletedAt gorm.DeletedAt `json:"-" gorm:"index"`
+	ID          uuid.UUID      `gorm:"type:uuid;default:uuid_generate_v4();primaryKey" json:"asdid"`
+	CreatedAt   time.Time      `                                                       json:"-"`      // auto populated by gorm
+	UpdatedAt   time.Time      `                                                       json:"-"`      // auto populated by gorm
+	DeletedAt   gorm.DeletedAt `gorm:"index"                                           json:"-"`      // auto populated by gorm
+	UserId      string         `                                                       json:"userId"` // user table is controlled by cloudbase-main
+	Code        string         `                                                       json:"code"`
+	Language    string         `                                                       json:"language"`
+	BuildStatus string         `                                                       json:"buildStatus"`
+	FailReason  string         `                                                       json:"failReason"`
 }
 
 func (f *Functions) ToJSON(w io.Writer) error {

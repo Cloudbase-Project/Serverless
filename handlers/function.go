@@ -11,6 +11,7 @@ import (
 
 	kuberneteswrapper "github.com/Cloudbase-Project/serverless/KubernetesWrapper"
 	"github.com/Cloudbase-Project/serverless/constants"
+	"github.com/Cloudbase-Project/serverless/dtos"
 	"github.com/Cloudbase-Project/serverless/services"
 	"github.com/gorilla/mux"
 
@@ -18,11 +19,6 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/client-go/kubernetes"
 )
-
-type PostCodeDTO struct {
-	code     string
-	language constants.Language
-}
 
 type FunctionHandler struct {
 	l       *log.Logger
@@ -129,23 +125,34 @@ func (f *FunctionHandler) DeployFunction(rw http.ResponseWriter, r *http.Request
 
 func (f *FunctionHandler) CreateFunction(rw http.ResponseWriter, r *http.Request) {
 
-	// TODO: 1. authenicate
+	// TODO: 1. authenicate and get userId
 	// TODO: 2. check if the service is enabled
 	// TODO: 3. save code to db
 
-	body := &PostCodeDTO{}
-
-	err := fromJSON(r.Body, body)
-	if err != nil {
-		http.Error(rw, "cannot read json", 400)
+	var data *dtos.PostCodeDTO
+	fromJSON(r.Body, data)
+	if _, err := dtos.Validate(data); err != nil {
+		http.Error(rw, "Validation error", 400)
+		return
 	}
+
+	// Commit to db
+	// TODO:
+	function, err := f.service.CreateFunction(data.Code, data.Language, "userId")
+	if err != nil {
+		http.Error(rw, "DB error", 500)
+	}
+
+	// err := fromJSON(r.Body, body)
+	// if err != nil {
+	// 	http.Error(rw, "cannot read json", 400)
+	// }
 
 	// TODO: get these from env variables
 	Registry := "ghcr.io"
 	Project := ""
-	CodeId := "uhquehqweoiqjeoqiwwhqodiqejd" // Code id
 
-	imageName := Registry + "/" + Project + "/" + CodeId + ":latest"
+	imageName := Registry + "/" + Project + "/" + function.ID.String() + ":latest"
 
 	namespace, err := f.kw.CreateNamespace(r.Context(), constants.Namespace)
 
@@ -163,8 +170,8 @@ func (f *FunctionHandler) CreateFunction(rw http.ResponseWriter, r *http.Request
 		&kuberneteswrapper.ImageBuilder{
 			Ctx:        r.Context(),
 			Namespace:  constants.Namespace,
-			FunctionId: "aweqwe",         // TODO:
-			Language:   constants.NODEJS, // TODO:
+			FunctionId: function.ID.String(),
+			Language:   constants.Language(function.Language),
 			ImageName:  imageName,
 		})
 
@@ -176,7 +183,7 @@ func (f *FunctionHandler) CreateFunction(rw http.ResponseWriter, r *http.Request
 	watchContext, cancelFunc := context.WithTimeout(context.Background(), 60*time.Second)
 	defer cancelFunc()
 
-	label, err := f.kw.BuildLabel("builder", []string{"codeID"}) // TODO:
+	label, err := f.kw.BuildLabel("builder", []string{function.ID.String()}) // TODO:
 	podWatch, err := f.kw.WatchImageBuilder(watchContext, label.String())
 
 	go func() {
@@ -191,14 +198,32 @@ func (f *FunctionHandler) CreateFunction(rw http.ResponseWriter, r *http.Request
 				// TODO: Commit status to DB
 				fmt.Println("image build success. pushed to db")
 				podWatch.Stop()
+				f.service.UpdateBuildStatus(
+					services.UpdateBuildStatusOptions{
+						Function: function,
+						Status:   "success",
+						Reason:   &p.Status.Message,
+					},
+				)
 				break
 			case corev1.PodFailed:
 				// TODO: Commit status to DB with message
 				fmt.Println("Image build failed. Reason : ", p.Status.Message)
 				podWatch.Stop()
+				f.service.UpdateBuildStatus(
+					services.UpdateBuildStatusOptions{
+						Function: function,
+						Status:   "failed",
+						Reason:   &p.Status.Message,
+					},
+				)
 				break
 			}
 		}
 	}()
+	<-watchContext.Done()
+	f.service.UpdateBuildStatus(
+		services.UpdateBuildStatusOptions{Function: function, Status: "failed"},
+	)
 
 }

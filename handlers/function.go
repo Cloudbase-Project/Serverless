@@ -1,4 +1,4 @@
-package function
+package handlers
 
 import (
 	"context"
@@ -11,6 +11,7 @@ import (
 
 	kuberneteswrapper "github.com/Cloudbase-Project/serverless/KubernetesWrapper"
 	"github.com/Cloudbase-Project/serverless/constants"
+	"github.com/Cloudbase-Project/serverless/services"
 
 	// appsv1 "k8s.io/api/core/v1"
 	corev1 "k8s.io/api/core/v1"
@@ -22,14 +23,19 @@ type PostCodeDTO struct {
 	language constants.Language
 }
 
-type Function struct {
-	l  *log.Logger
-	kw *kuberneteswrapper.KubernetesWrapper
+type FunctionHandler struct {
+	l       *log.Logger
+	service *services.FunctionService
+	kw      *kuberneteswrapper.KubernetesWrapper
 }
 
-func NewFunction(client *kubernetes.Clientset, l *log.Logger) *Function {
+func NewFunctionHandler(
+	client *kubernetes.Clientset,
+	l *log.Logger,
+	s *services.FunctionService,
+) *FunctionHandler {
 	kw := kuberneteswrapper.NewWrapper(client)
-	return &Function{l: l, kw: kw}
+	return &FunctionHandler{l: l, service: s, kw: kw}
 }
 
 func fromJSON(body io.Reader, value interface{}) interface{} {
@@ -37,29 +43,42 @@ func fromJSON(body io.Reader, value interface{}) interface{} {
 	return d.Decode(value)
 }
 
-func (f *Function) ListFunctions(rw http.ResponseWriter, r *http.Request) {
+// Get all functions created by this user.
+func (f *FunctionHandler) ListFunctions(rw http.ResponseWriter, r *http.Request) {
+
+	functions, err := f.service.GetAllFunctions()
+	if err != nil {
+		http.Error(rw, "DB error", 400)
+	}
+
+	err = functions.ToJSON(rw)
+	if err != nil {
+		http.Error(rw, "Unable to marshal JSON", http.StatusInternalServerError)
+	}
+
+	json.NewEncoder(rw).Encode(functions)
+
+}
+
+func (f *FunctionHandler) UpdateFunction(rw http.ResponseWriter, r *http.Request) {
 	http.Error(rw, "Not Implemented", 500)
 }
 
-func (f *Function) UpdateFunction(rw http.ResponseWriter, r *http.Request) {
+func (f *FunctionHandler) DeleteFunction(rw http.ResponseWriter, r *http.Request) {
 	http.Error(rw, "Not Implemented", 500)
 }
 
-func (f *Function) DeleteFunction(rw http.ResponseWriter, r *http.Request) {
+func (f *FunctionHandler) GetFunction(rw http.ResponseWriter, r *http.Request) {
 	http.Error(rw, "Not Implemented", 500)
 }
 
-func (f *Function) GetFunction(rw http.ResponseWriter, r *http.Request) {
-	http.Error(rw, "Not Implemented", 500)
-}
-
-func (f *Function) GetFunctionLogs(rw http.ResponseWriter, r *http.Request) {
+func (f *FunctionHandler) GetFunctionLogs(rw http.ResponseWriter, r *http.Request) {
 	http.Error(rw, "Not Implemented", 500)
 }
 
 // Create a deployment and a clusterIP service for the function.
 // Errors if no image is found for the function
-func (f *Function) DeployFunction(rw http.ResponseWriter, r *http.Request) {
+func (f *FunctionHandler) DeployFunction(rw http.ResponseWriter, r *http.Request) {
 
 	// TODO: Get function from db.
 	// check if status is complete and only then try to deploy
@@ -97,7 +116,7 @@ func (f *Function) DeployFunction(rw http.ResponseWriter, r *http.Request) {
 
 }
 
-func (f *Function) CreateFunction(rw http.ResponseWriter, r *http.Request) {
+func (f *FunctionHandler) CreateFunction(rw http.ResponseWriter, r *http.Request) {
 
 	// TODO: 1. authenicate
 	// TODO: 2. check if the service is enabled

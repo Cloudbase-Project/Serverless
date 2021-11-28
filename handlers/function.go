@@ -1,13 +1,11 @@
 package handlers
 
 import (
-	"context"
 	"encoding/json"
 	"fmt"
 	"io"
 	"log"
 	"net/http"
-	"time"
 
 	kuberneteswrapper "github.com/Cloudbase-Project/serverless/KubernetesWrapper"
 	"github.com/Cloudbase-Project/serverless/constants"
@@ -15,7 +13,6 @@ import (
 	"github.com/Cloudbase-Project/serverless/services"
 	"github.com/gorilla/mux"
 
-	corev1 "k8s.io/api/core/v1"
 	"k8s.io/client-go/kubernetes"
 )
 
@@ -130,7 +127,7 @@ func (f *FunctionHandler) DeployFunction(rw http.ResponseWriter, r *http.Request
 	// Watch status
 	// watch for 1 min and then close everything
 
-	f.service.WatchDeployment(f.kw, function, constants.Namespace)
+	err = f.service.WatchDeployment(f.kw, function, constants.Namespace)
 
 	// TODO: register with the custom router
 
@@ -179,7 +176,7 @@ func (f *FunctionHandler) CreateFunction(rw http.ResponseWriter, r *http.Request
 
 	// create kaniko pod
 
-	pod, err := f.kw.CreateImageBuilder(
+	_, err = f.kw.CreateImageBuilder(
 		&kuberneteswrapper.ImageBuilder{
 			Ctx:        r.Context(),
 			Namespace:  constants.Namespace,
@@ -192,57 +189,6 @@ func (f *FunctionHandler) CreateFunction(rw http.ResponseWriter, r *http.Request
 
 	rw.Write([]byte("Building Image for your code"))
 
-	// watch for 1 min and then close everything
-	watchContext, cancelFunc := context.WithTimeout(context.Background(), 60*time.Second)
-	defer cancelFunc()
-
-	label, err := f.kw.BuildLabel("builder", []string{function.ID.String()}) // TODO:
-	podWatch, err := f.kw.WatchImageBuilder(watchContext, label.String())
-
-	go func() {
-		for event := range podWatch.ResultChan() {
-			p, ok := event.Object.(*corev1.Pod)
-			if !ok {
-				fmt.Println("unexpected type")
-			}
-			// Check Pod Phase. If its failed or succeeded.
-			switch p.Status.Phase {
-			case corev1.PodSucceeded:
-				// TODO: Commit status to DB
-				fmt.Println("image build success. pushed to db")
-				podWatch.Stop()
-				f.service.UpdateBuildStatus(
-					services.UpdateBuildStatusOptions{
-						Function: function,
-						Status:   string(constants.BuildSuccess),
-						Reason:   &p.Status.Message,
-					},
-				)
-				break
-			case corev1.PodFailed:
-				// TODO: Commit status to DB with message
-				fmt.Println("Image build failed. Reason : ", p.Status.Message)
-				podWatch.Stop()
-				f.service.UpdateBuildStatus(
-					services.UpdateBuildStatusOptions{
-						Function: function,
-						Status:   string(constants.BuildFailed),
-						Reason:   &p.Status.Message,
-					},
-				)
-				break
-			}
-		}
-	}()
-	<-watchContext.Done()
-	var reason *string
-	*reason = "Watch Timeout"
-	f.service.UpdateBuildStatus(
-		services.UpdateBuildStatusOptions{
-			Function: function,
-			Status:   string(constants.BuildFailed),
-			Reason:   reason,
-		},
-	)
+	err = f.service.WatchImageBuilder(f.kw, function, constants.Namespace)
 
 }

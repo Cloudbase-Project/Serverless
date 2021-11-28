@@ -52,7 +52,7 @@ func (kw *KubernetesWrapper) BuildLabel(key string, value []string) (*labels.Req
 	return labels.NewRequirement(key, selection.Equals, value)
 }
 
-func (kw *KubernetesWrapper) WatchImageBuilder(
+func (kw *KubernetesWrapper) GetImageBuilderWatcher(
 	ctx context.Context,
 	label string,
 ) (watch.Interface, error) {

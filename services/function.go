@@ -12,6 +12,7 @@ import (
 	"github.com/Cloudbase-Project/serverless/models"
 	"gorm.io/gorm"
 	appsv1 "k8s.io/api/apps/v1"
+	corev1 "k8s.io/api/core/v1"
 )
 
 type FunctionService struct {
@@ -118,7 +119,7 @@ func (fs *FunctionService) WatchDeployment(
 	kw *kuberneteswrapper.KubernetesWrapper,
 	function *models.Function,
 	namespace string,
-) {
+) error {
 	watchContext, cancelFunc := context.WithTimeout(context.Background(), 60*time.Second)
 	defer cancelFunc()
 
@@ -129,7 +130,7 @@ func (fs *FunctionService) WatchDeployment(
 		namespace,
 	)
 	if err != nil {
-		fs.l.Print("Error watching deployment")
+		return err
 	}
 
 	go func() {
@@ -169,5 +170,64 @@ func (fs *FunctionService) WatchDeployment(
 	function.DeployStatus = string(constants.DeploymentFailed)
 	function.DeployFailReason = "Watch Timeout"
 	fs.SaveFunction(function)
+	return nil
+}
+
+func (fs *FunctionService) WatchImageBuilder(
+	kw *kuberneteswrapper.KubernetesWrapper,
+	function *models.Function,
+	namespace string,
+) error {
+
+	// watch for 1 min and then close everything
+	watchContext, cancelFunc := context.WithTimeout(context.Background(), 60*time.Second)
+	defer cancelFunc()
+
+	label, err := kw.BuildLabel("builder", []string{function.ID.String()}) // TODO:
+	podWatch, err := kw.GetImageBuilderWatcher(watchContext, label.String())
+
+	go func() {
+		for event := range podWatch.ResultChan() {
+			p, ok := event.Object.(*corev1.Pod)
+			if !ok {
+				fmt.Println("unexpected type")
+			}
+			// Check Pod Phase. If its failed or succeeded.
+			switch p.Status.Phase {
+			case corev1.PodSucceeded:
+				// TODO: Commit status to DB
+				fmt.Println("image build success. pushed to db")
+				podWatch.Stop()
+				fs.UpdateBuildStatus(
+					UpdateBuildStatusOptions{
+						Function: function,
+						Status:   string(constants.BuildSuccess),
+						Reason:   &p.Status.Message,
+					},
+				)
+				break
+			case corev1.PodFailed:
+				// TODO: Commit status to DB with message
+				fmt.Println("Image build failed. Reason : ", p.Status.Message)
+				podWatch.Stop()
+				fs.UpdateBuildStatus(
+					UpdateBuildStatusOptions{
+						Function: function,
+						Status:   string(constants.BuildFailed),
+						Reason:   &p.Status.Message,
+					},
+				)
+				break
+			}
+		}
+	}()
+	<-watchContext.Done()
+	var reason *string
+	*reason = "Watch Timeout"
+	function.BuildStatus = string(constants.BuildFailed)
+	function.BuildFailReason = "Watch Timeout"
+	fs.SaveFunction(function)
+
+	return err
 
 }

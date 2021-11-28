@@ -13,15 +13,18 @@ import (
 type Functions []*Function
 
 type Function struct {
-	ID          uuid.UUID      `gorm:"type:uuid;default:uuid_generate_v4();primaryKey" json:"asdid"`
-	CreatedAt   time.Time      `                                                       json:"-"`      // auto populated by gorm
-	UpdatedAt   time.Time      `                                                       json:"-"`      // auto populated by gorm
-	DeletedAt   gorm.DeletedAt `gorm:"index"                                           json:"-"`      // auto populated by gorm
-	UserId      string         `                                                       json:"userId"` // user table is controlled by cloudbase-main
-	Code        string         `                                                       json:"code"`
-	Language    string         `                                                       json:"language"`
-	BuildStatus string         `                                                       json:"buildStatus"`
-	FailReason  string         `                                                       json:"failReason"`
+	ID               uuid.UUID      `gorm:"type:uuid;default:uuid_generate_v4();primaryKey" json:"asdid"`
+	CreatedAt        time.Time      `                                                       json:"-"`      // auto populated by gorm
+	UpdatedAt        time.Time      `                                                       json:"-"`      // auto populated by gorm
+	DeletedAt        gorm.DeletedAt `gorm:"index"                                           json:"-"`      // auto populated by gorm
+	UserId           string         `                                                       json:"userId"` // user table is controlled by cloudbase-main
+	Code             string         `                                                       json:"code"`
+	Language         string         `                                                       json:"language"`
+	BuildStatus      string         `                                                       json:"buildStatus"`
+	BuildFailReason  string         `                                                       json:"buildFailReason"`
+	DeployStatus     string         `                                                       json:"deployStatus"`
+	DeployFailReason string         `                                                       json:"deployFailReason"`
+	// LastAction string `json:"lastAction"`
 }
 
 func (f *Functions) ToJSON(w io.Writer) error {

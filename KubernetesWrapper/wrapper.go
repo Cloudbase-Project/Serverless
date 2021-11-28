@@ -65,6 +65,16 @@ func (kw *KubernetesWrapper) WatchImageBuilder(
 			metav1.ListOptions{LabelSelector: label})
 }
 
+func (kw *KubernetesWrapper) GetDeploymentWatcher(
+	ctx context.Context,
+	label string,
+	namespace string,
+) (watch.Interface, error) {
+	return kw.KClient.AppsV1().
+		Deployments(namespace).
+		Watch(ctx, metav1.ListOptions{LabelSelector: label})
+}
+
 func (kw *KubernetesWrapper) CreateImageBuilder(ib *ImageBuilder) (*corev1.Pod, error) {
 
 	var Dockerfile string

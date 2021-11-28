@@ -61,7 +61,12 @@ type UpdateBuildStatusOptions struct {
 func (fs *FunctionService) UpdateBuildStatus(data UpdateBuildStatusOptions) {
 	data.Function.BuildStatus = data.Status
 	if data.Reason != nil {
-		data.Function.FailReason = *data.Reason
+		data.Function.BuildFailReason = *data.Reason
 	}
 	fs.db.Save(data.Function)
+}
+
+func (fs *FunctionService) SaveFunction(function *models.Function) {
+
+	fs.db.Save(function)
 }

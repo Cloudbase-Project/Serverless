@@ -17,6 +17,14 @@ const (
 type BuildStatus string
 
 const (
-	BuildSuccess BuildStatus = "success"
-	BuildFailed  BuildStatus = "failed"
+	BuildSuccess BuildStatus = "Success"
+	BuildFailed  BuildStatus = "Failed"
+)
+
+type DeploymentStatus string
+
+const (
+	DeploymentFailed DeploymentStatus = "DeploymentFailed"
+	Deployed         DeploymentStatus = "Deployed"
+	Deploying        DeploymentStatus = "Deploying"
 )

@@ -11,6 +11,7 @@ import (
 	"github.com/Cloudbase-Project/serverless/constants"
 	"github.com/Cloudbase-Project/serverless/dtos"
 	"github.com/Cloudbase-Project/serverless/services"
+	"github.com/Cloudbase-Project/serverless/utils"
 	"github.com/gorilla/mux"
 
 	"k8s.io/client-go/kubernetes"
@@ -68,7 +69,56 @@ func (f *FunctionHandler) GetFunction(rw http.ResponseWriter, r *http.Request) {
 }
 
 func (f *FunctionHandler) UpdateFunction(rw http.ResponseWriter, r *http.Request) {
-	http.Error(rw, "Not Implemented", 500)
+	// set status to readyToDeploy
+	// set LastAction to update
+
+	vars := mux.Vars(r)
+
+	var data *dtos.UpdateCodeDTO
+	fromJSON(r.Body, data)
+
+	if _, err := dtos.Validate(data); err != nil {
+		http.Error(rw, "Validation error", 400)
+		return
+	}
+
+	// get the function.
+	function, err := f.service.GetFunction(vars["codeId"])
+	if err != nil {
+		http.Error(rw, "DB error", 500)
+	}
+
+	// update the code.
+	function.Code = data.Code
+
+	// save it
+	f.service.SaveFunction(function)
+
+	imageName := utils.BuildImageName(function.ID.String())
+
+	// build image
+	f.kw.CreateImageBuilder(&kuberneteswrapper.ImageBuilder{
+		Ctx:        r.Context(),
+		Namespace:  constants.Namespace,
+		FunctionId: function.ID.String(),
+		Language:   constants.Language(function.Language),
+		ImageName:  imageName,
+	})
+
+	rw.Write([]byte("Building new image for your updated code"))
+
+	result := f.service.WatchImageBuilder(f.kw, function, constants.Namespace)
+	if result.Err != nil {
+		http.Error(rw, "Error watching image builder", 500)
+	}
+
+	function.BuildFailReason = result.Reason
+	function.BuildStatus = result.Status
+	// TODO: Should Come back to this. maybe have to add lastAction  = update
+	//
+	function.DeployStatus = string(constants.RedeployRequired)
+	f.service.SaveFunction(function)
+
 }
 
 func (f *FunctionHandler) DeleteFunction(rw http.ResponseWriter, r *http.Request) {
@@ -92,8 +142,9 @@ func (f *FunctionHandler) DeployFunction(rw http.ResponseWriter, r *http.Request
 	}
 
 	// check if status is complete and only then try to deploy
-	if function.BuildStatus == string(constants.BuildFailed) {
-		http.Error(rw, "Image not built. Build image again to continue.", 400)
+	if function.BuildStatus == string(constants.BuildFailed) ||
+		function.DeployStatus == string(constants.Deployed) {
+		http.Error(rw, "Cannot perform this action currently.", 400)
 		return
 	}
 
@@ -127,7 +178,14 @@ func (f *FunctionHandler) DeployFunction(rw http.ResponseWriter, r *http.Request
 	// Watch status
 	// watch for 1 min and then close everything
 
-	err = f.service.WatchDeployment(f.kw, function, constants.Namespace)
+	result := f.service.WatchDeployment(f.kw, function, constants.Namespace)
+	if result.Err != nil {
+		http.Error(rw, "Error watching deployment", 500)
+	}
+
+	function.DeployFailReason = result.Reason
+	function.DeployStatus = result.Status
+	f.service.SaveFunction(function)
 
 	// TODO: register with the custom router
 
@@ -189,6 +247,13 @@ func (f *FunctionHandler) CreateFunction(rw http.ResponseWriter, r *http.Request
 
 	rw.Write([]byte("Building Image for your code"))
 
-	err = f.service.WatchImageBuilder(f.kw, function, constants.Namespace)
+	result := f.service.WatchImageBuilder(f.kw, function, constants.Namespace)
+	if result.Err != nil {
+		http.Error(rw, "Error watching image builder", 500)
+	}
+
+	function.BuildFailReason = result.Reason
+	function.BuildStatus = result.Status
+	f.service.SaveFunction(function)
 
 }

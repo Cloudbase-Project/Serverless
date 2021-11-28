@@ -18,3 +18,7 @@ type PostCodeDTO struct {
 	Code     string             `valid:"required;type(string)"`
 	Language constants.Language `valid:"required;type(string)"`
 }
+
+type UpdateCodeDTO struct {
+	Code string `valid:"required;type(string)"`
+}

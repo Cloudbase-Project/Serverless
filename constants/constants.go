@@ -27,4 +27,6 @@ const (
 	DeploymentFailed DeploymentStatus = "DeploymentFailed"
 	Deployed         DeploymentStatus = "Deployed"
 	Deploying        DeploymentStatus = "Deploying"
+	// signifies that function has be recently updated.
+	RedeployRequired DeploymentStatus = "RedeployRequired"
 )

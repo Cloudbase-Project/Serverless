@@ -61,7 +61,7 @@ func main() {
 
 	db.AutoMigrate(&models.Function{})
 
-	fs := services.NewFunctionService(db)
+	fs := services.NewFunctionService(db, logger)
 
 	function := handlers.NewFunctionHandler(clientset, logger, fs)
 

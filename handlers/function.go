@@ -15,7 +15,6 @@ import (
 	"github.com/Cloudbase-Project/serverless/services"
 	"github.com/gorilla/mux"
 
-	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/client-go/kubernetes"
 )
@@ -96,7 +95,6 @@ func (f *FunctionHandler) DeployFunction(rw http.ResponseWriter, r *http.Request
 	}
 
 	// check if status is complete and only then try to deploy
-
 	if function.BuildStatus == string(constants.BuildFailed) {
 		http.Error(rw, "Image not built. Build image again to continue.", 400)
 		return
@@ -109,78 +107,30 @@ func (f *FunctionHandler) DeployFunction(rw http.ResponseWriter, r *http.Request
 
 	imageName := "qweqwe" // TODO:
 
-	deployment, err := f.kw.CreateDeployment(&kuberneteswrapper.DeploymentOptions{
-		Ctx:             r.Context(),
-		Namespace:       constants.Namespace,
-		FunctionId:      function.ID.String(),
-		ImageName:       imageName,
-		DeploymentLabel: deploymentLabel,
-		Replicas:        replicas,
-	})
+	err = f.service.DeployFunction(
+		f.kw,
+		r.Context(),
+		constants.Namespace,
+		function.ID.String(),
+		deploymentLabel,
+		imageName,
+		replicas,
+	)
+	if err != nil {
+		http.Error(rw, "Error deploying your image.", 500)
+		return
+	}
 
-	// create a clusterIP service for the deployment
-
-	service, err := f.kw.CreateService(&kuberneteswrapper.ServiceOptions{
-		Ctx:             r.Context(),
-		Namespace:       constants.Namespace,
-		FunctionId:      function.ID.String(),
-		DeploymentLabel: deploymentLabel,
-	})
-
-	// Watch status and update in db
+	// update status in db
 	function.DeployStatus = string(constants.Deploying)
 	f.service.SaveFunction(function)
 
 	rw.Write([]byte("Deploying your function..."))
 
+	// Watch status
 	// watch for 1 min and then close everything
-	watchContext, cancelFunc := context.WithTimeout(context.Background(), 60*time.Second)
-	defer cancelFunc()
 
-	label, err := f.kw.BuildLabel("app", []string{function.ID.String()}) // TODO:
-	deploymentWatch, err := f.kw.GetDeploymentWatcher(
-		watchContext,
-		label.String(),
-		constants.Namespace,
-	)
-
-	go func() {
-		for event := range deploymentWatch.ResultChan() {
-			p, ok := event.Object.(*appsv1.Deployment)
-			if !ok {
-				fmt.Println("unexpected type")
-			}
-
-			if p.Status.UpdatedReplicas == *p.Spec.Replicas &&
-				p.Status.Replicas == *p.Spec.Replicas &&
-				p.Status.AvailableReplicas == *p.Spec.Replicas &&
-				p.Status.ObservedGeneration >= p.GetObjectMeta().GetGeneration() {
-				// deployment complete
-				f.l.Print("Deployment available replicas = required replicas")
-				if p.Status.Conditions[0].Type == appsv1.DeploymentAvailable {
-					f.l.Print("Deployment Available")
-				}
-				function.DeployStatus = string(constants.Deployed)
-				f.service.SaveFunction(function)
-				break
-			} else if p.Status.Conditions[0].Type == appsv1.DeploymentProgressing {
-				f.l.Print("Deployment in Progress")
-			} else if p.Status.Conditions[0].Type == appsv1.DeploymentReplicaFailure {
-				f.l.Print("Replica failure. Reason : ", p.Status.Conditions[0].Message)
-				function.DeployStatus = string(constants.DeploymentFailed)
-				function.DeployFailReason = p.Status.Conditions[0].Message
-				f.service.SaveFunction(function)
-				break
-
-			}
-
-		}
-	}()
-	<-watchContext.Done()
-	// Update status in db
-	function.DeployStatus = string(constants.DeploymentFailed)
-	function.DeployFailReason = "Watch Timeout"
-	f.service.SaveFunction(function)
+	f.service.WatchDeployment(f.kw, function, constants.Namespace)
 
 	// TODO: register with the custom router
 

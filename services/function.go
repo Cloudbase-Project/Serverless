@@ -53,6 +53,7 @@ func (fs *FunctionService) GetFunction(codeId string) (*models.Function, error) 
 	return &function, nil
 }
 
+// Create a function in the db.
 func (fs *FunctionService) CreateFunction(
 	code string,
 	language constants.Language,
@@ -60,24 +61,10 @@ func (fs *FunctionService) CreateFunction(
 ) (*models.Function, error) {
 
 	var function models.Function
-	if err := fs.db.Create(&models.Function{Code: code, Language: string(language), UserId: userId}).Error; err != nil {
+	if err := fs.db.Create(&models.Function{Code: code, Language: string(language), UserId: userId, BuildStatus: string(constants.Building)}).Error; err != nil {
 		return nil, err
 	}
 	return &function, nil
-}
-
-type UpdateBuildStatusOptions struct {
-	Function *models.Function
-	Status   string
-	Reason   *string
-}
-
-func (fs *FunctionService) UpdateBuildStatus(data UpdateBuildStatusOptions) {
-	data.Function.BuildStatus = data.Status
-	if data.Reason != nil {
-		data.Function.BuildFailReason = *data.Reason
-	}
-	fs.db.Save(data.Function)
 }
 
 func (fs *FunctionService) SaveFunction(function *models.Function) {

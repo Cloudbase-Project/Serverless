@@ -90,6 +90,7 @@ func (f *FunctionHandler) UpdateFunction(rw http.ResponseWriter, r *http.Request
 
 	// update the code.
 	function.Code = data.Code
+	function.BuildStatus = string(constants.Building)
 
 	// save it
 	f.service.SaveFunction(function)
@@ -133,7 +134,7 @@ func (f *FunctionHandler) GetFunctionLogs(rw http.ResponseWriter, r *http.Reques
 // Errors if no image is found for the function
 func (f *FunctionHandler) DeployFunction(rw http.ResponseWriter, r *http.Request) {
 
-	// TODO: Get function from db.
+	//  Get function from db.
 	vars := mux.Vars(r)
 
 	function, err := f.service.GetFunction(vars["codeId"])
@@ -150,10 +151,10 @@ func (f *FunctionHandler) DeployFunction(rw http.ResponseWriter, r *http.Request
 
 	deploymentLabel := map[string]string{"app": function.ID.String()}
 
-	var replicas int32
-	replicas = 1
+	// TODO: Should change to constant
+	replicas := int32(1)
 
-	imageName := "qweqwe" // TODO:
+	imageName := utils.BuildImageName(function.ID.String())
 
 	err = f.service.DeployFunction(
 		f.kw,
@@ -211,7 +212,6 @@ func (f *FunctionHandler) CreateFunction(rw http.ResponseWriter, r *http.Request
 		http.Error(rw, "DB error", 500)
 	}
 
-	// err := fromJSON(r.Body, body)
 	// if err != nil {
 	// 	http.Error(rw, "cannot read json", 400)
 	// }

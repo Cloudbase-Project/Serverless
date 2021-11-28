@@ -17,6 +17,7 @@ const (
 type BuildStatus string
 
 const (
+	Building     BuildStatus = "Building"
 	BuildSuccess BuildStatus = "Success"
 	BuildFailed  BuildStatus = "Failed"
 )

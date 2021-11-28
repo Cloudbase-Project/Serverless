@@ -20,6 +20,12 @@ type FunctionService struct {
 	l  *log.Logger
 }
 
+type WatchResult struct {
+	Status string
+	Reason string
+	Err    error
+}
+
 func NewFunctionService(db *gorm.DB, l *log.Logger) *FunctionService {
 	return &FunctionService{db: db, l: l}
 }
@@ -119,7 +125,7 @@ func (fs *FunctionService) WatchDeployment(
 	kw *kuberneteswrapper.KubernetesWrapper,
 	function *models.Function,
 	namespace string,
-) error {
+) WatchResult {
 	watchContext, cancelFunc := context.WithTimeout(context.Background(), 60*time.Second)
 	defer cancelFunc()
 
@@ -130,10 +136,12 @@ func (fs *FunctionService) WatchDeployment(
 		namespace,
 	)
 	if err != nil {
-		return err
+		return WatchResult{Err: err}
 	}
 
-	go func() {
+	dataChan := make(chan WatchResult)
+
+	go func(dataChan chan WatchResult) {
 		for event := range deploymentWatch.ResultChan() {
 			p, ok := event.Object.(*appsv1.Deployment)
 			if !ok {
@@ -149,44 +157,52 @@ func (fs *FunctionService) WatchDeployment(
 				if p.Status.Conditions[0].Type == appsv1.DeploymentAvailable {
 					fs.l.Print("Deployment Available")
 				}
-				function.DeployStatus = string(constants.Deployed)
-				fs.SaveFunction(function)
+				dataChan <- WatchResult{Status: string(constants.Deployed), Err: nil}
 				break
 			} else if p.Status.Conditions[0].Type == appsv1.DeploymentProgressing {
 				fs.l.Print("Deployment in Progress")
 			} else if p.Status.Conditions[0].Type == appsv1.DeploymentReplicaFailure {
 				fs.l.Print("Replica failure. Reason : ", p.Status.Conditions[0].Message)
-				function.DeployStatus = string(constants.DeploymentFailed)
-				function.DeployFailReason = p.Status.Conditions[0].Message
+				dataChan <- WatchResult{Status: string(constants.DeploymentFailed), Reason: p.Status.Conditions[0].Message, Err: nil}
 				fs.SaveFunction(function)
 				break
 
 			}
 
 		}
-	}()
-	<-watchContext.Done()
-	// Update status in db
-	function.DeployStatus = string(constants.DeploymentFailed)
-	function.DeployFailReason = "Watch Timeout"
-	fs.SaveFunction(function)
-	return nil
+	}(dataChan)
+
+	select {
+	case <-watchContext.Done():
+		return WatchResult{
+			Status: string(constants.DeploymentFailed),
+			Reason: "Watch Timeout",
+			Err:    nil,
+		}
+	case x := <-dataChan:
+		return x
+	}
 }
 
 func (fs *FunctionService) WatchImageBuilder(
 	kw *kuberneteswrapper.KubernetesWrapper,
 	function *models.Function,
 	namespace string,
-) error {
+) WatchResult {
 
 	// watch for 1 min and then close everything
 	watchContext, cancelFunc := context.WithTimeout(context.Background(), 60*time.Second)
 	defer cancelFunc()
 
-	label, err := kw.BuildLabel("builder", []string{function.ID.String()}) // TODO:
+	label, _ := kw.BuildLabel("builder", []string{function.ID.String()}) // TODO:
 	podWatch, err := kw.GetImageBuilderWatcher(watchContext, label.String())
+	if err != nil {
+		return WatchResult{Err: err}
+	}
 
-	go func() {
+	dataChan := make(chan WatchResult)
+
+	go func(dataChan chan WatchResult) {
 		for event := range podWatch.ResultChan() {
 			p, ok := event.Object.(*corev1.Pod)
 			if !ok {
@@ -198,36 +214,23 @@ func (fs *FunctionService) WatchImageBuilder(
 				// TODO: Commit status to DB
 				fmt.Println("image build success. pushed to db")
 				podWatch.Stop()
-				fs.UpdateBuildStatus(
-					UpdateBuildStatusOptions{
-						Function: function,
-						Status:   string(constants.BuildSuccess),
-						Reason:   &p.Status.Message,
-					},
-				)
+				dataChan <- WatchResult{Status: string(constants.BuildSuccess), Reason: p.Status.Message, Err: nil}
 				break
 			case corev1.PodFailed:
 				// TODO: Commit status to DB with message
 				fmt.Println("Image build failed. Reason : ", p.Status.Message)
 				podWatch.Stop()
-				fs.UpdateBuildStatus(
-					UpdateBuildStatusOptions{
-						Function: function,
-						Status:   string(constants.BuildFailed),
-						Reason:   &p.Status.Message,
-					},
-				)
+				dataChan <- WatchResult{Status: string(constants.BuildFailed), Reason: p.Status.Message, Err: nil}
 				break
 			}
 		}
-	}()
-	<-watchContext.Done()
-	var reason *string
-	*reason = "Watch Timeout"
-	function.BuildStatus = string(constants.BuildFailed)
-	function.BuildFailReason = "Watch Timeout"
-	fs.SaveFunction(function)
+	}(dataChan)
 
-	return err
+	select {
+	case <-watchContext.Done():
+		return WatchResult{Status: string(constants.BuildFailed), Reason: "Watch Timeout", Err: nil}
+	case x := <-dataChan:
+		return x
+	}
 
 }

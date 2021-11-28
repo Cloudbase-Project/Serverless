@@ -75,6 +75,7 @@ func (kw *KubernetesWrapper) GetDeploymentWatcher(
 		Watch(ctx, metav1.ListOptions{LabelSelector: label})
 }
 
+// Build an image for the given functionId and image name
 func (kw *KubernetesWrapper) CreateImageBuilder(ib *ImageBuilder) (*corev1.Pod, error) {
 
 	var Dockerfile string

@@ -13,3 +13,10 @@ const (
 	Namespace           = "serverless"
 	RegistryCredentials = "qweqwe"
 )
+
+type BuildStatus string
+
+const (
+	BuildSuccess BuildStatus = "success"
+	BuildFailed  BuildStatus = "failed"
+)

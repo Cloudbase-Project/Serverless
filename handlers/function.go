@@ -88,9 +88,21 @@ func (f *FunctionHandler) GetFunctionLogs(rw http.ResponseWriter, r *http.Reques
 func (f *FunctionHandler) DeployFunction(rw http.ResponseWriter, r *http.Request) {
 
 	// TODO: Get function from db.
+	vars := mux.Vars(r)
+
+	function, err := f.service.GetFunction(vars["codeId"])
+	if err != nil {
+		http.Error(rw, "DB error", 500)
+	}
+
 	// check if status is complete and only then try to deploy
 
-	deploymentLabel := map[string]string{"app": "codeId"}
+	if function.BuildStatus == string(constants.BuildFailed) {
+		http.Error(rw, "Image not built. Build image again to continue.", 400)
+		return
+	}
+
+	deploymentLabel := map[string]string{"app": function.ID.String()}
 
 	var replicas int32
 	replicas = 1
@@ -100,7 +112,7 @@ func (f *FunctionHandler) DeployFunction(rw http.ResponseWriter, r *http.Request
 	deployment, err := f.kw.CreateDeployment(&kuberneteswrapper.DeploymentOptions{
 		Ctx:             r.Context(),
 		Namespace:       constants.Namespace,
-		FunctionId:      "qweqwe",
+		FunctionId:      function.ID.String(),
 		ImageName:       imageName,
 		DeploymentLabel: deploymentLabel,
 		Replicas:        replicas,
@@ -111,7 +123,7 @@ func (f *FunctionHandler) DeployFunction(rw http.ResponseWriter, r *http.Request
 	service, err := f.kw.CreateService(&kuberneteswrapper.ServiceOptions{
 		Ctx:             r.Context(),
 		Namespace:       constants.Namespace,
-		FunctionId:      "qweqwe",
+		FunctionId:      function.ID.String(),
 		DeploymentLabel: deploymentLabel,
 	})
 
@@ -201,7 +213,7 @@ func (f *FunctionHandler) CreateFunction(rw http.ResponseWriter, r *http.Request
 				f.service.UpdateBuildStatus(
 					services.UpdateBuildStatusOptions{
 						Function: function,
-						Status:   "success",
+						Status:   string(constants.BuildSuccess),
 						Reason:   &p.Status.Message,
 					},
 				)
@@ -213,7 +225,7 @@ func (f *FunctionHandler) CreateFunction(rw http.ResponseWriter, r *http.Request
 				f.service.UpdateBuildStatus(
 					services.UpdateBuildStatusOptions{
 						Function: function,
-						Status:   "failed",
+						Status:   string(constants.BuildFailed),
 						Reason:   &p.Status.Message,
 					},
 				)
@@ -223,7 +235,10 @@ func (f *FunctionHandler) CreateFunction(rw http.ResponseWriter, r *http.Request
 	}()
 	<-watchContext.Done()
 	f.service.UpdateBuildStatus(
-		services.UpdateBuildStatusOptions{Function: function, Status: "failed"},
+		services.UpdateBuildStatusOptions{
+			Function: function,
+			Status:   string(constants.BuildFailed),
+		},
 	)
 
 }

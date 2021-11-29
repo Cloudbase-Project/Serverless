@@ -2,6 +2,7 @@ package kuberneteswrapper
 
 import (
 	"context"
+	"time"
 
 	"github.com/Cloudbase-Project/serverless/constants"
 	"github.com/Cloudbase-Project/serverless/utils"
@@ -43,6 +44,18 @@ type ServiceOptions struct {
 	Namespace       string
 	FunctionId      string
 	DeploymentLabel map[string]string
+}
+
+type UpdateOptions struct {
+	Ctx       context.Context
+	Namespace string
+	Name      string
+}
+
+type DeleteOptions struct {
+	Ctx       context.Context
+	Name      string
+	Namespace string
 }
 
 func NewWrapper(client *kubernetes.Clientset) *KubernetesWrapper {
@@ -207,12 +220,6 @@ func (kw *KubernetesWrapper) CreateService(options *ServiceOptions) (*corev1.Ser
 		}, metav1.CreateOptions{})
 }
 
-type DeleteOptions struct {
-	Ctx       context.Context
-	Name      string
-	Namespace string
-}
-
 // Delete the deployment
 func (kw *KubernetesWrapper) DeleteDeployment(options *DeleteOptions) error {
 	return kw.KClient.AppsV1().
@@ -225,4 +232,26 @@ func (kw *KubernetesWrapper) DeleteService(options *DeleteOptions) error {
 	return kw.KClient.CoreV1().
 		Services(options.Namespace).
 		Delete(options.Ctx, options.Name, metav1.DeleteOptions{})
+}
+
+// updates the deployment label with current timestamp to trigger a redeploy
+func (kw *KubernetesWrapper) UpdateDeployment(options *UpdateOptions) error {
+
+	deployment, err := kw.KClient.AppsV1().
+		Deployments(options.Namespace).
+		Get(options.Ctx, options.Name, metav1.GetOptions{})
+
+	if err != nil {
+		return err
+	}
+
+	deployment.Spec.Template.ObjectMeta.Annotations["date"] = time.Now().String()
+
+	_, err = kw.KClient.AppsV1().
+		Deployments(options.Namespace).
+		Update(options.Ctx, deployment, metav1.UpdateOptions{})
+	if err != nil {
+		return err
+	}
+	return nil
 }

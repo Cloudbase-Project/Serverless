@@ -86,6 +86,9 @@ func main() {
 	// Create function creates function image. User has to deploy/redeploy for deployments to take effect.
 	router.HandleFunc("/function/{codeId}/deploy", function.DeployFunction).Methods(http.MethodPost)
 
+	router.HandleFunc("/function/{codeId}/redeploy", function.RedeployFunction).
+		Methods(http.MethodPost)
+
 	server := http.Server{
 		Addr:    ":" + PORT,
 		Handler: router,

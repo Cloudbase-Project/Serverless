@@ -110,7 +110,8 @@ func (f *FunctionHandler) UpdateFunction(rw http.ResponseWriter, r *http.Request
 
 	result := f.service.WatchImageBuilder(f.kw, function, constants.Namespace)
 	if result.Err != nil {
-		http.Error(rw, "Error watching image builder", 500)
+		// http.Error(rw, "Error watching image builder", 500)
+		f.l.Print("error watching image builder", result.Err)
 	}
 
 	function.BuildFailReason = result.Reason
@@ -128,12 +129,8 @@ func (f *FunctionHandler) DeleteFunction(rw http.ResponseWriter, r *http.Request
 
 	codeId := vars["codeId"]
 
-	function, err := f.service.GetFunction(codeId)
-	if err != nil {
-		http.Error(rw, "DB error", 500)
-	}
 	// delete it.
-	err = f.service.DeleteFunction(codeId)
+	err := f.service.DeleteFunction(codeId)
 	if err != nil {
 		f.l.Print(err)
 		http.Error(rw, "DB error", 500)
@@ -304,4 +301,33 @@ func (f *FunctionHandler) CreateFunction(rw http.ResponseWriter, r *http.Request
 	function.BuildStatus = result.Status
 	f.service.SaveFunction(function)
 
+}
+
+func (f *FunctionHandler) RedeployFunction(rw http.ResponseWriter, r *http.Request) {
+	vars := mux.Vars(r)
+
+	function, err := f.service.GetFunction(vars["codeId"])
+	if err != nil {
+		http.Error(rw, "DB error", 500)
+	}
+
+	if function.LastAction == string(constants.UpdateAction) &&
+		function.DeployStatus == string(constants.RedeployRequired) &&
+		function.BuildStatus == string(constants.BuildSuccess) {
+		// proceed
+
+		err = f.kw.UpdateDeployment(&kuberneteswrapper.UpdateOptions{
+			Ctx:       context.Background(),
+			Namespace: constants.Namespace,
+			Name:      function.ID.String(),
+		})
+		if err != nil {
+			f.l.Print(err)
+			http.Error(rw, "error occured when redeploying", 500)
+		}
+		rw.Write([]byte("Deploying your code..."))
+
+	} else {
+		http.Error(rw, "Cannot perform this action.", 400)
+	}
 }

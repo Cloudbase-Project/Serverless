@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -116,14 +117,42 @@ func (f *FunctionHandler) UpdateFunction(rw http.ResponseWriter, r *http.Request
 	function.BuildFailReason = result.Reason
 	function.BuildStatus = result.Status
 	// TODO: Should Come back to this. maybe have to add lastAction  = update
-	//
 	function.DeployStatus = string(constants.RedeployRequired)
 	f.service.SaveFunction(function)
 
 }
 
 func (f *FunctionHandler) DeleteFunction(rw http.ResponseWriter, r *http.Request) {
-	http.Error(rw, "Not Implemented", 500)
+	// get function from db
+	vars := mux.Vars(r)
+
+	codeId := vars["codeId"]
+
+	function, err := f.service.GetFunction(codeId)
+	if err != nil {
+		http.Error(rw, "DB error", 500)
+	}
+	// delete it.
+	err = f.service.DeleteFunction(codeId)
+	if err != nil {
+		f.l.Print(err)
+		http.Error(rw, "DB error", 500)
+	}
+	// TODO: delete resources
+	serviceName := utils.BuildServiceName(codeId)
+
+	err = f.service.DeleteFunctionResources(
+		f.kw,
+		context.Background(),
+		constants.Namespace,
+		codeId,
+		serviceName,
+	)
+	if err != nil {
+		f.l.Print(err)
+		http.Error(rw, "Err deleting resources", 500)
+	}
+	// TODO: Remove from router
 }
 
 func (f *FunctionHandler) GetFunctionLogs(rw http.ResponseWriter, r *http.Request) {

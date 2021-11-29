@@ -71,6 +71,15 @@ func (fs *FunctionService) SaveFunction(function *models.Function) {
 	fs.db.Save(function)
 }
 
+// Delete a function with its primary key.
+func (fs *FunctionService) DeleteFunction(codeId string) error {
+	// fs.db.Delete(&Function, "id = ?", codeId)
+	if err := fs.db.Where("id = ?", codeId).Delete(&models.Function{}).Error; err != nil {
+		return err
+	}
+	return nil
+}
+
 // Deploys a function. Creates a deployment and a clusterIP service
 func (fs *FunctionService) DeployFunction(
 	kw *kuberneteswrapper.KubernetesWrapper,
@@ -219,5 +228,37 @@ func (fs *FunctionService) WatchImageBuilder(
 	case x := <-dataChan:
 		return x
 	}
+}
 
+// Deletes the function's deployment and clusterIP service
+func (fs *FunctionService) DeleteFunctionResources(
+	kw *kuberneteswrapper.KubernetesWrapper,
+	ctx context.Context,
+	namespace string,
+	deploymentName string,
+	serviceName string,
+) error {
+
+	deploymentDeleteOptions := kuberneteswrapper.DeleteOptions{
+		Ctx:       ctx,
+		Name:      deploymentName,
+		Namespace: namespace,
+	}
+
+	err := kw.DeleteDeployment(&deploymentDeleteOptions)
+	if err != nil {
+		return err
+	}
+
+	serviceDeleteOptions := kuberneteswrapper.DeleteOptions{
+		Ctx:       ctx,
+		Name:      serviceName,
+		Namespace: namespace,
+	}
+
+	err = kw.DeleteService(&serviceDeleteOptions)
+	if err != nil {
+		return err
+	}
+	return nil
 }

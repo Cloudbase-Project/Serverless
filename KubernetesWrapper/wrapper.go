@@ -4,6 +4,7 @@ import (
 	"context"
 
 	"github.com/Cloudbase-Project/serverless/constants"
+	"github.com/Cloudbase-Project/serverless/utils"
 	"k8s.io/client-go/kubernetes"
 
 	// appsv1 "k8s.io/api/core/v1"
@@ -186,12 +187,15 @@ func (kw *KubernetesWrapper) CreateDeployment(options *DeploymentOptions) (*v1.D
 }
 
 func (kw *KubernetesWrapper) CreateService(options *ServiceOptions) (*corev1.Service, error) {
+
+	serviceName := utils.BuildServiceName(options.FunctionId)
+
 	return kw.KClient.CoreV1().
 		Services(options.Namespace).
 		Create(options.Ctx, &corev1.Service{
 			TypeMeta: metav1.TypeMeta{Kind: "Service", APIVersion: "v1"},
 			ObjectMeta: metav1.ObjectMeta{
-				Name: options.FunctionId + " srv",
+				Name: serviceName,
 			},
 			Spec: corev1.ServiceSpec{
 				Selector: options.DeploymentLabel,
@@ -201,4 +205,24 @@ func (kw *KubernetesWrapper) CreateService(options *ServiceOptions) (*corev1.Ser
 				},
 			},
 		}, metav1.CreateOptions{})
+}
+
+type DeleteOptions struct {
+	Ctx       context.Context
+	Name      string
+	Namespace string
+}
+
+// Delete the deployment
+func (kw *KubernetesWrapper) DeleteDeployment(options *DeleteOptions) error {
+	return kw.KClient.AppsV1().
+		Deployments(options.Namespace).
+		Delete(options.Ctx, options.Name, metav1.DeleteOptions{})
+}
+
+// Delete the service
+func (kw *KubernetesWrapper) DeleteService(options *DeleteOptions) error {
+	return kw.KClient.CoreV1().
+		Services(options.Namespace).
+		Delete(options.Ctx, options.Name, metav1.DeleteOptions{})
 }

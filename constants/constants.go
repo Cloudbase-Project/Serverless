@@ -20,6 +20,7 @@ const (
 	Building     BuildStatus = "Building"
 	BuildSuccess BuildStatus = "Success"
 	BuildFailed  BuildStatus = "Failed"
+	NotBuilt     BuildStatus = "NotBuilt"
 )
 
 type DeploymentStatus string
@@ -30,4 +31,14 @@ const (
 	Deploying        DeploymentStatus = "Deploying"
 	// signifies that function has be recently updated.
 	RedeployRequired DeploymentStatus = "RedeployRequired"
+	NotDeployed      DeploymentStatus = "NotDeployed"
+)
+
+type LastAction string
+
+const (
+	UpdateAction LastAction = "Update"
+	DeployAction LastAction = "Deploy"
+	BuildAction  LastAction = "Build"
+	CreateAction LastAction = "Create"
 )

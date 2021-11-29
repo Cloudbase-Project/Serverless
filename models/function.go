@@ -20,11 +20,11 @@ type Function struct {
 	UserId           string         `                                                       json:"userId"` // user table is controlled by cloudbase-main
 	Code             string         `                                                       json:"code"`
 	Language         string         `                                                       json:"language"`
-	BuildStatus      string         `                                                       json:"buildStatus"`
+	BuildStatus      string         `gorm:"default:'NotBuilt'"                              json:"buildStatus"`
 	BuildFailReason  string         `                                                       json:"buildFailReason"`
-	DeployStatus     string         `                                                       json:"deployStatus"`
+	DeployStatus     string         `gorm:"default:'NotDeployed'"                           json:"deployStatus"`
 	DeployFailReason string         `                                                       json:"deployFailReason"`
-	// LastAction string `json:"lastAction"`
+	LastAction       string         `gorm:"default:'Create'"                                json:"lastAction"`
 }
 
 func (f *Functions) ToJSON(w io.Writer) error {

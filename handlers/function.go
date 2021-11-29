@@ -92,7 +92,6 @@ func (f *FunctionHandler) UpdateFunction(rw http.ResponseWriter, r *http.Request
 	// update the code.
 	function.Code = data.Code
 	function.BuildStatus = string(constants.Building)
-
 	// save it
 	f.service.SaveFunction(function)
 
@@ -117,6 +116,7 @@ func (f *FunctionHandler) UpdateFunction(rw http.ResponseWriter, r *http.Request
 	function.BuildFailReason = result.Reason
 	function.BuildStatus = result.Status
 	// TODO: Should Come back to this. maybe have to add lastAction  = update
+	function.LastAction = string(constants.UpdateAction)
 	function.DeployStatus = string(constants.RedeployRequired)
 	f.service.SaveFunction(function)
 
@@ -156,7 +156,10 @@ func (f *FunctionHandler) DeleteFunction(rw http.ResponseWriter, r *http.Request
 }
 
 func (f *FunctionHandler) GetFunctionLogs(rw http.ResponseWriter, r *http.Request) {
-	http.Error(rw, "Not Implemented", 500)
+	// get function
+	// check if its deployStatus is deployed
+	// check if lastAction is deploy
+	// check if
 }
 
 // Create a deployment and a clusterIP service for the function.
@@ -171,53 +174,69 @@ func (f *FunctionHandler) DeployFunction(rw http.ResponseWriter, r *http.Request
 		http.Error(rw, "DB error", 500)
 	}
 
-	// check if status is complete and only then try to deploy
-	if function.BuildStatus == string(constants.BuildFailed) ||
-		function.DeployStatus == string(constants.Deployed) {
-		http.Error(rw, "Cannot perform this action currently.", 400)
-		return
+	if function.BuildStatus == string(constants.BuildSuccess) &&
+		function.DeployStatus == string(constants.NotDeployed) &&
+		function.LastAction == string(constants.BuildAction) {
+		// proceed
+
+		deploymentLabel := map[string]string{"app": function.ID.String()}
+
+		// TODO: Should change to constant
+		replicas := int32(1)
+
+		imageName := utils.BuildImageName(function.ID.String())
+
+		err = f.service.DeployFunction(
+			f.kw,
+			r.Context(),
+			constants.Namespace,
+			function.ID.String(),
+			deploymentLabel,
+			imageName,
+			replicas,
+		)
+		if err != nil {
+			http.Error(rw, "Error deploying your image.", 500)
+			return
+		}
+
+		// update status in db
+		function.DeployStatus = string(constants.Deploying)
+		f.service.SaveFunction(function)
+
+		rw.Write([]byte("Deploying your function..."))
+
+		// Watch status
+		// watch for 1 min and then close everything
+
+		result := f.service.WatchDeployment(f.kw, function, constants.Namespace)
+		if result.Err != nil {
+			http.Error(rw, "Error watching deployment", 500)
+		}
+
+		function.DeployFailReason = result.Reason
+		function.DeployStatus = result.Status
+		f.service.SaveFunction(function)
+
+		// TODO: register with the custom router
+
+	} else {
+		http.Error(rw, "Cannot perform this action currently", 400)
 	}
 
-	deploymentLabel := map[string]string{"app": function.ID.String()}
+	// if function.LastAction == string(constants.UpdateAction) ||
+	// 	function.LastAction == string(constants.DeployAction) {
+	// 	http.Error(rw, "Function Already deployed or must be redeployed", 400)
+	// }
 
-	// TODO: Should change to constant
-	replicas := int32(1)
-
-	imageName := utils.BuildImageName(function.ID.String())
-
-	err = f.service.DeployFunction(
-		f.kw,
-		r.Context(),
-		constants.Namespace,
-		function.ID.String(),
-		deploymentLabel,
-		imageName,
-		replicas,
-	)
-	if err != nil {
-		http.Error(rw, "Error deploying your image.", 500)
-		return
-	}
-
-	// update status in db
-	function.DeployStatus = string(constants.Deploying)
-	f.service.SaveFunction(function)
-
-	rw.Write([]byte("Deploying your function..."))
-
-	// Watch status
-	// watch for 1 min and then close everything
-
-	result := f.service.WatchDeployment(f.kw, function, constants.Namespace)
-	if result.Err != nil {
-		http.Error(rw, "Error watching deployment", 500)
-	}
-
-	function.DeployFailReason = result.Reason
-	function.DeployStatus = result.Status
-	f.service.SaveFunction(function)
-
-	// TODO: register with the custom router
+	// // check if status is complete and only then try to deploy
+	// if (function.BuildStatus == string(constants.BuildFailed)) ||
+	// 	(function.DeployStatus == string(constants.RedeployRequired)) ||
+	// 	(function.DeployStatus == string(constants.Deployed)) ||
+	// 	(function.LastAction == string(constants.UpdateAction)) {
+	// 	http.Error(rw, "Cannot perform this action currently.", 400)
+	// 	return
+	// }
 
 }
 

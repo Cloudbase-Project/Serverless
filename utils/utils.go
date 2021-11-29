@@ -11,3 +11,10 @@ func BuildImageName(functionId string) string {
 	imageName := Registry + "/" + Project + "/" + functionId + ":latest"
 	return imageName
 }
+
+// returns a service name given a functionId
+//
+// eg: 127319ey71e291y2e12e01u-srv
+func BuildServiceName(functionId string) string {
+	return functionId + "-srv"
+}

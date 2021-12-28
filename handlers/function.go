@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"fmt"
@@ -15,6 +16,7 @@ import (
 	"github.com/Cloudbase-Project/serverless/utils"
 	"github.com/gorilla/mux"
 
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/client-go/kubernetes"
 )
 
@@ -153,7 +155,33 @@ func (f *FunctionHandler) DeleteFunction(rw http.ResponseWriter, r *http.Request
 }
 
 func (f *FunctionHandler) GetFunctionLogs(rw http.ResponseWriter, r *http.Request) {
+	vars := mux.Vars(r)
+
 	// get function
+	function, err := f.service.GetFunction(vars["codeId"])
+
+	if function.DeployStatus == string(constants.Deployed) &&
+		function.LastAction != string(constants.DeployAction) {
+		// get the logs for the given function
+		req := f.kw.KClient.CoreV1().
+			Pods(constants.Namespace).
+			GetLogs("deployment/"+function.ID.String(), &v1.PodLogOptions{Follow: true})
+
+		podLogs, err := req.Stream(r.Context())
+		defer podLogs.Close()
+
+		rw = utils.SetSSEHeaders(rw)
+
+		buf := new(bytes.Buffer)
+		_, err = io.Copy(buf, podLogs)
+		fmt.Fprintf(rw, "data: %v\n\n", buf.String())
+		if f, ok := rw.(http.Flusher); ok {
+			f.Flush()
+		}
+
+	} else {
+		http.Error(rw, "Cannot perform this action currently", 400)
+	}
 	// check if its deployStatus is deployed
 	// check if lastAction is deploy
 	// check if

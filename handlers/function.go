@@ -16,7 +16,6 @@ import (
 	"github.com/Cloudbase-Project/serverless/utils"
 	"github.com/gorilla/mux"
 
-	v1 "k8s.io/api/core/v1"
 	"k8s.io/client-go/kubernetes"
 )
 
@@ -163,11 +162,14 @@ func (f *FunctionHandler) GetFunctionLogs(rw http.ResponseWriter, r *http.Reques
 	if function.DeployStatus == string(constants.Deployed) &&
 		function.LastAction != string(constants.DeployAction) {
 		// get the logs for the given function
-		req := f.kw.KClient.CoreV1().
-			Pods(constants.Namespace).
-			GetLogs("deployment/"+function.ID.String(), &v1.PodLogOptions{Follow: true})
 
-		podLogs, err := req.Stream(r.Context())
+		podLogs, err := f.service.GetDeploymentLogs(
+			f.kw,
+			r.Context(),
+			constants.Namespace,
+			function.ID.String(),
+			true,
+		)
 		defer podLogs.Close()
 
 		rw = utils.SetSSEHeaders(rw)

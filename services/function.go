@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"io"
 	"log"
 	"time"
 
@@ -13,6 +14,7 @@ import (
 	"gorm.io/gorm"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 )
 
 type FunctionService struct {
@@ -261,4 +263,16 @@ func (fs *FunctionService) DeleteFunctionResources(
 		return err
 	}
 	return nil
+}
+
+func (fs *FunctionService) GetDeploymentLogs(kw *kuberneteswrapper.KubernetesWrapper,
+	ctx context.Context,
+	namespace string, deploymentName string, follow bool) (io.ReadCloser, error) {
+
+	req := kw.KClient.CoreV1().
+		Pods(namespace).
+		GetLogs("deployment/"+deploymentName, &v1.PodLogOptions{Follow: follow})
+
+	podLogs, err := req.Stream(ctx)
+	return podLogs, err
 }

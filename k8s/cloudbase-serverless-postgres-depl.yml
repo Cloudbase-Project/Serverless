@@ -13,12 +13,21 @@ spec:
         spec:
             containers:
                 - name: cloudbase-serverless-postgres-depl
-                  image: postgres:9.6.1
-
-                  # resources:
-                  # limits:
-                  #   memory: '128Mi'
-                  #   cpu: '500m'
+                  image: vnavaneeth/serverless-postgres
+                  #   image: postgres:10.1
+                  ports:
+                      - containerPort: 5432
+                  env:
+                      - name: POSTGRES_DB
+                        value: cloudbase
+                      - name: POSTGRES_USER
+                        value: cloudbase
+                      - name: POSTGRES_PASSWORD
+                        value: cloudbase
+                  resources:
+                # limits:
+                #   memory: '128Mi'
+                #   cpu: '500m'
 
 ---
 apiVersion: v1

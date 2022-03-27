@@ -3,6 +3,8 @@ package kuberneteswrapper
 import (
 	"context"
 	"fmt"
+	"os"
+	"regexp"
 	"time"
 
 	"github.com/Cloudbase-Project/serverless/constants"
@@ -105,7 +107,19 @@ func (kw *KubernetesWrapper) CreateImageBuilder(ib *ImageBuilder) (*corev1.Pod, 
 
 	fmt.Println("the code : ", ib.Code)
 
-	return kw.KClient.CoreV1().Pods(ib.Namespace).Create(ib.Ctx, &corev1.Pod{
+	m1 := regexp.MustCompile(`"`)
+	packagejson := m1.ReplaceAllString(constants.NodejsPackageJSON, `\"`)
+	dockerfile := m1.ReplaceAllString(Dockerfile, `\"`)
+
+	fmt.Println(
+		"THIS IS THE CODE : ",
+		`echo -e  "`+ib.Code+`" >> /workspace/index.js && echo -e "`+dockerfile+`" >> /workspace/Dockerfile && echo -e "`+packagejson+`" >> /workspace/package.json`,
+	)
+
+	REGISTRY := os.Getenv("REGISTRY")
+	BASE64_CREDENTIALS := os.Getenv("BASE64_CREDENTIALS")
+
+	pod, err := kw.KClient.CoreV1().Pods(ib.Namespace).Create(ib.Ctx, &corev1.Pod{
 		TypeMeta: metav1.TypeMeta{
 			Kind:       "Pod",
 			APIVersion: "v1",
@@ -124,13 +138,14 @@ func (kw *KubernetesWrapper) CreateImageBuilder(ib *ImageBuilder) (*corev1.Pod, 
 					"/bin/sh",
 					"-c",
 					// "curl -XGET http://cloudbase-serverless-srv.default:3000/worker/queue -o /workspace/index.js && echo -e " + Dockerfile + " >> /workspace/Dockerfile && echo -e " + constants.NodejsPackageJSON + " >> /workspace/package.json && echo -e " + constants.RegistryCredentials + " >> /kaniko/.docker/config.json ",
-					"echo -e " + ib.Code + " >> /workspace/index.js && echo -e " + Dockerfile + " >> /workspace/Dockerfile && echo -e " + constants.NodejsPackageJSON + " >> /workspace/package.json",
+					// "echo -e " + ib.Code + " >> /workspace/index.js && echo -e " + Dockerfile + " >> /workspace/Dockerfile && echo -e " + constants.NodejsPackageJSON + " >> /workspace/package.json",
+					`echo -e  "` + ib.Code + `" >> /workspace/index.js && echo -e "` + dockerfile + `" >> /workspace/Dockerfile && echo -e "` + packagejson + `" >> /workspace/package.json && echo -e "{\"auths\":{\"` + REGISTRY + `\":{\"auth\": \"` + BASE64_CREDENTIALS + `\" }}}" > /kaniko/.docker/config.json`,
 				},
 				VolumeMounts: []corev1.VolumeMount{{
 					Name:      "shared",
 					MountPath: "/workspace",
 				}, {
-					Name:      "dockerConfig",
+					Name:      "dockerconfig",
 					MountPath: "/kaniko/.docker",
 				}},
 			}},
@@ -147,7 +162,7 @@ func (kw *KubernetesWrapper) CreateImageBuilder(ib *ImageBuilder) (*corev1.Pod, 
 					Name:      "shared",
 					MountPath: "/workspace",
 				}, {
-					Name:      "dockerConfig",
+					Name:      "dockerconfig",
 					MountPath: "/kaniko/.docker",
 				}},
 			}},
@@ -155,22 +170,24 @@ func (kw *KubernetesWrapper) CreateImageBuilder(ib *ImageBuilder) (*corev1.Pod, 
 			Volumes: []corev1.Volume{{
 				Name: "shared", VolumeSource: corev1.VolumeSource{EmptyDir: &corev1.EmptyDirVolumeSource{}},
 			},
-				// {
-				// 	Name: "dockerConfig", VolumeSource: corev1.VolumeSource{EmptyDir: &corev1.EmptyDirVolumeSource{}},
-				// },
-				{Name: "dockerConfig",
-					VolumeSource: corev1.VolumeSource{
-						Secret: &corev1.SecretVolumeSource{
-							SecretName: "regcred",
-							Items: []corev1.KeyToPath{
-								{Key: ".dockerconfigjson", Path: "config.json"},
-							},
-						},
-					}},
+				{
+					Name: "dockerconfig", VolumeSource: corev1.VolumeSource{EmptyDir: &corev1.EmptyDirVolumeSource{}},
+				},
+				// {Name: "dockerconfig",
+				// 	VolumeSource: corev1.VolumeSource{
+				// 		Secret: &corev1.SecretVolumeSource{
+				// 			SecretName: "regcred",
+				// 			Items: []corev1.KeyToPath{
+				// 				{Key: ".dockerconfigjson", Path: "config.json"},
+				// 			},
+				// 		},
+				// 	}},
 			},
 		},
 	}, metav1.CreateOptions{})
-
+	fmt.Printf("pod: %v\n", pod)
+	fmt.Printf("err: %v\n", err)
+	return pod, err
 }
 
 func (kw *KubernetesWrapper) CreateNamespace(

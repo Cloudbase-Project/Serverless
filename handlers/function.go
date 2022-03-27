@@ -8,6 +8,7 @@ import (
 	"io"
 	"log"
 	"net/http"
+	"os"
 
 	kuberneteswrapper "github.com/Cloudbase-Project/serverless/KubernetesWrapper"
 	"github.com/Cloudbase-Project/serverless/constants"
@@ -280,9 +281,12 @@ func (f *FunctionHandler) CreateFunction(rw http.ResponseWriter, r *http.Request
 	// TODO: 3. save code to db
 
 	var data *dtos.PostCodeDTO
-	fromJSON(r.Body, data)
+	fmt.Printf("r.Body: %v\n", r.Body)
+	fromJSON(r.Body, &data)
+	fmt.Printf("data: %v\n", data)
+	fmt.Println(":daa : ", data)
 	if _, err := dtos.Validate(data); err != nil {
-		http.Error(rw, "Validation error", 400)
+		http.Error(rw, "Validation error : "+err.Error(), 400)
 		return
 	}
 
@@ -292,17 +296,19 @@ func (f *FunctionHandler) CreateFunction(rw http.ResponseWriter, r *http.Request
 	if err != nil {
 		http.Error(rw, "DB error", 500)
 	}
+	fmt.Printf("function: %v\n", function)
 
 	// if err != nil {
 	// 	http.Error(rw, "cannot read json", 400)
 	// }
 
 	// TODO: get these from env variables
-	Registry := "ghcr.io"
-	Project := ""
+	Registry := os.Getenv("REGISTRY")
+	Project := os.Getenv("PROJECT_NAME")
 
-	imageName := Registry + "/" + Project + "/" + function.ID.String() + ":latest"
-
+	// imageName := Registry + "/" + Project + "/" + function.ID.String() + ":latest"
+	imageName := Registry + "/" + Project + "/" + "test1" + ":latest"
+	fmt.Printf("imageName: %v\n", imageName)
 	namespace, err := f.kw.CreateNamespace(r.Context(), constants.Namespace)
 
 	// create namespace if not exist
@@ -325,6 +331,10 @@ func (f *FunctionHandler) CreateFunction(rw http.ResponseWriter, r *http.Request
 			Code:       function.Code,
 		})
 
+	if err != nil {
+		http.Error(rw, "erroror : "+err.Error(), 400)
+	}
+
 	// podLogs = clientset.CoreV1().Pods("serverless").GetLogs("kaniko-worker", &v1.PodLogOptions{})
 
 	rw.Write([]byte("Building Image for your code"))
@@ -332,6 +342,7 @@ func (f *FunctionHandler) CreateFunction(rw http.ResponseWriter, r *http.Request
 	result := f.service.WatchImageBuilder(f.kw, function, constants.Namespace)
 	if result.Err != nil {
 		http.Error(rw, "Error watching image builder", 500)
+		fmt.Println("err : ", result.Err.Error())
 	}
 
 	function.BuildFailReason = result.Reason

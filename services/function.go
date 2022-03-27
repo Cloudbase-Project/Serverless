@@ -62,10 +62,13 @@ func (fs *FunctionService) CreateFunction(
 	userId string,
 ) (*models.Function, error) {
 
-	var function models.Function
-	if err := fs.db.Create(&models.Function{Code: code, Language: string(language), UserId: userId, BuildStatus: string(constants.Building)}).Error; err != nil {
-		return nil, err
-	}
+	function := models.Function{Code: code, Language: string(language), UserId: userId}
+	// if err := fs.db.Create(&models.Function{Code: code, Language: string(language), UserId: userId, BuildStatus: string(constants.Building)}).Error; err != nil {
+	// 	return nil, err
+	// }
+
+	result := fs.db.Create(&function)
+	fmt.Printf("result: %v\n", &result)
 	return &function, nil
 }
 
@@ -211,8 +214,8 @@ func (fs *FunctionService) WatchImageBuilder(
 			case corev1.PodSucceeded:
 				// TODO: Commit status to DB
 				fmt.Println("image build success. pushed to db")
-				podWatch.Stop()
 				dataChan <- WatchResult{Status: string(constants.BuildSuccess), Reason: p.Status.Message, Err: nil}
+				podWatch.Stop()
 				break
 			case corev1.PodFailed:
 				// TODO: Commit status to DB with message

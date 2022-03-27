@@ -1,0 +1,2 @@
+FROM postgres:10.1
+COPY ./install-extension.sql /docker-entrypoint-initdb.d

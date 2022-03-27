@@ -9,7 +9,8 @@ RUN go mod download
 
 COPY . ./
 
-RUN go build -o /serverless
+# RUN go build -o /serverless
 
-CMD [ "/serverless" ]
+# CMD [ "/serverless" ]
 
+CMD ["go", "run", "main.go"]

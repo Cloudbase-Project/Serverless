@@ -2,6 +2,7 @@ package kuberneteswrapper
 
 import (
 	"context"
+	"fmt"
 	"time"
 
 	"github.com/Cloudbase-Project/serverless/constants"
@@ -28,6 +29,7 @@ type ImageBuilder struct {
 	FunctionId string
 	Language   constants.Language
 	ImageName  string
+	Code       string
 }
 
 type DeploymentOptions struct {
@@ -101,6 +103,8 @@ func (kw *KubernetesWrapper) CreateImageBuilder(ib *ImageBuilder) (*corev1.Pod, 
 	// 	Dockerfile = constants.GolangDockerfile
 	// }
 
+	fmt.Println("the code : ", ib.Code)
+
 	return kw.KClient.CoreV1().Pods(ib.Namespace).Create(ib.Ctx, &corev1.Pod{
 		TypeMeta: metav1.TypeMeta{
 			Kind:       "Pod",
@@ -119,7 +123,8 @@ func (kw *KubernetesWrapper) CreateImageBuilder(ib *ImageBuilder) (*corev1.Pod, 
 				Command: []string{
 					"/bin/sh",
 					"-c",
-					"curl -XGET http://cloudbase-serverless-srv.default:3000/worker/queue -o /workspace/index.js && echo -e " + Dockerfile + " >> /workspace/Dockerfile && echo -e " + constants.NodejsPackageJSON + " >> /workspace/package.json && echo -e " + constants.RegistryCredentials + " >> /kaniko/.docker/config.json ",
+					// "curl -XGET http://cloudbase-serverless-srv.default:3000/worker/queue -o /workspace/index.js && echo -e " + Dockerfile + " >> /workspace/Dockerfile && echo -e " + constants.NodejsPackageJSON + " >> /workspace/package.json && echo -e " + constants.RegistryCredentials + " >> /kaniko/.docker/config.json ",
+					"echo -e " + ib.Code + " >> /workspace/index.js && echo -e " + Dockerfile + " >> /workspace/Dockerfile && echo -e " + constants.NodejsPackageJSON + " >> /workspace/package.json",
 				},
 				VolumeMounts: []corev1.VolumeMount{{
 					Name:      "shared",
@@ -149,9 +154,20 @@ func (kw *KubernetesWrapper) CreateImageBuilder(ib *ImageBuilder) (*corev1.Pod, 
 			RestartPolicy: corev1.RestartPolicyNever,
 			Volumes: []corev1.Volume{{
 				Name: "shared", VolumeSource: corev1.VolumeSource{EmptyDir: &corev1.EmptyDirVolumeSource{}},
-			}, {
-				Name: "dockerConfig", VolumeSource: corev1.VolumeSource{EmptyDir: &corev1.EmptyDirVolumeSource{}},
-			}},
+			},
+				// {
+				// 	Name: "dockerConfig", VolumeSource: corev1.VolumeSource{EmptyDir: &corev1.EmptyDirVolumeSource{}},
+				// },
+				{Name: "dockerConfig",
+					VolumeSource: corev1.VolumeSource{
+						Secret: &corev1.SecretVolumeSource{
+							SecretName: "regcred",
+							Items: []corev1.KeyToPath{
+								{Key: ".dockerconfigjson", Path: "config.json"},
+							},
+						},
+					}},
+			},
 		},
 	}, metav1.CreateOptions{})
 
@@ -193,6 +209,7 @@ func (kw *KubernetesWrapper) CreateDeployment(options *DeploymentOptions) (*v1.D
 								Image: options.ImageName, // "image name from db", // should be ghcr.io/projectname/codeId:latest
 								Ports: []corev1.ContainerPort{{ContainerPort: 3000}},
 							}},
+							ImagePullSecrets: []corev1.LocalObjectReference{{Name: "regcred"}},
 						},
 					},
 				},

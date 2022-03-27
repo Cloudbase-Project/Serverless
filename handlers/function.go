@@ -158,6 +158,9 @@ func (f *FunctionHandler) GetFunctionLogs(rw http.ResponseWriter, r *http.Reques
 
 	// get function
 	function, err := f.service.GetFunction(vars["codeId"])
+	if err != nil {
+		http.Error(rw, "Error getting function, "+err.Error(), 400)
+	}
 
 	if function.DeployStatus == string(constants.Deployed) &&
 		function.LastAction != string(constants.DeployAction) {
@@ -170,6 +173,9 @@ func (f *FunctionHandler) GetFunctionLogs(rw http.ResponseWriter, r *http.Reques
 			function.ID.String(),
 			true,
 		)
+		if err != nil {
+			http.Error(rw, "Error getting logs"+err.Error(), 500)
+		}
 		defer podLogs.Close()
 
 		rw = utils.SetSSEHeaders(rw)
@@ -316,6 +322,7 @@ func (f *FunctionHandler) CreateFunction(rw http.ResponseWriter, r *http.Request
 			FunctionId: function.ID.String(),
 			Language:   constants.Language(function.Language),
 			ImageName:  imageName,
+			Code:       function.Code,
 		})
 
 	// podLogs = clientset.CoreV1().Pods("serverless").GetLogs("kaniko-worker", &v1.PodLogOptions{})

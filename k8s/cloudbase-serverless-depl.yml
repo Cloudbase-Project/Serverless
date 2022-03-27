@@ -1,0 +1,36 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+    name: cloudbase-serverless-depl
+spec:
+    selector:
+        matchLabels:
+            app: cloudbase-serverless-depl
+    template:
+        metadata:
+            labels:
+                app: cloudbase-serverless-depl
+        spec:
+            containers:
+                - name: cloudbase-serverless-depl
+                  image: vnavaneeth/cloudbase-serverless
+                  imagePullPolicy: 'Never'
+                  # resources:
+                  # limits:
+                  #   memory: "128Mi"
+                  #   cpu: "500m"
+                  # ports:
+                  # - containerPort: <Port>
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+    name: cloudbase-serverless-svc
+spec:
+    selector:
+        app: cloudbase-serverless-depl
+    type: ClusterIP
+    ports:
+        - port: 4000
+          targetPort: 4000

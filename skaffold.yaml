@@ -1,0 +1,27 @@
+apiVersion: skaffold/v2alpha3
+kind: Config
+metadata:
+    name: 'cloudbase-serverless'
+build:
+    local:
+        push: false
+    artifacts:
+        - image: vnavaneeth/cloudbase-serverless
+          context: ./
+          docker:
+              dockerfile: Dockerfile
+          sync:
+              manual:
+                  # - src: 'src/**.ts'
+                  - src: './**'
+                    dest: .
+        - image: vnavaneeth/serverless-postgres
+          context: ./
+          docker:
+              dockerfile: Dockerfile.postgres
+
+deploy:
+    kubectl:
+        manifests:
+            - ./k8s/*.yml
+            - ../frontend/k8s/ingress-svc.yml

@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"fmt"
 	"log"
 	"net/http"
 	"os"
@@ -29,11 +30,14 @@ func main() {
 	if err != nil {
 		logger.Fatal("Cannot load env variables")
 	}
+	x := os.Environ()
+	fmt.Printf("x: %v\n", x)
 
 	PORT, ok := os.LookupEnv("PORT")
 	if !ok {
 		PORT = "3000"
 	}
+	logger.Println("hello world runnign boid")
 
 	router := mux.NewRouter()
 
@@ -51,13 +55,22 @@ func main() {
 		panic(err)
 	}
 
-	dsn := "host=localhost user=gorm password=gorm dbname=gorm port=9920 sslmode=disable TimeZone=Asia/Shanghai"
-	db, err := gorm.Open(postgres.Open(dsn), &gorm.Config{})
-	if err != nil {
-		panic("failed to connect database")
-	}
+	// dsn := "host=localhost user=gorm password=gorm dbname=gorm port=9920 sslmode=disable TimeZone=Asia/Shanghai"
+	dsn := os.Getenv("POSTGRES_URI")
+	fmt.Printf("dsn: %v\n", dsn)
+	var db *gorm.DB
 
-	logger.Print("Connected to DB")
+	for i := 0; i < 5; i++ {
+		db, err = gorm.Open(postgres.Open(dsn), &gorm.Config{})
+		if err != nil {
+			log.Println("failed to connect database")
+			time.Sleep(time.Second * 10)
+			continue
+		}
+		logger.Print("Connected to DB")
+		break
+
+	}
 
 	db.AutoMigrate(&models.Function{})
 

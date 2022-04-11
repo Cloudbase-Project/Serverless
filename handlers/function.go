@@ -89,6 +89,7 @@ func (f *FunctionHandler) UpdateFunction(rw http.ResponseWriter, r *http.Request
 	function, err := f.service.GetFunction(vars["codeId"])
 	if err != nil {
 		http.Error(rw, "DB error", 500)
+
 	}
 
 	// update the code.
@@ -196,8 +197,11 @@ func (f *FunctionHandler) GetFunctionLogs(rw http.ResponseWriter, r *http.Reques
 	// check if
 }
 
-// Create a deployment and a clusterIP service for the function.
-// Errors if no image is found for the function
+/*
+Create a deployment and a clusterIP service for the function.
+
+Errors if no image is found for the function
+*/
 func (f *FunctionHandler) DeployFunction(rw http.ResponseWriter, r *http.Request) {
 
 	//  Get function from db.
@@ -230,6 +234,7 @@ func (f *FunctionHandler) DeployFunction(rw http.ResponseWriter, r *http.Request
 			replicas,
 		)
 		if err != nil {
+			fmt.Printf("err: %v\n", err.Error())
 			http.Error(rw, "Error deploying your image.", 500)
 			return
 		}
@@ -239,7 +244,7 @@ func (f *FunctionHandler) DeployFunction(rw http.ResponseWriter, r *http.Request
 		f.service.SaveFunction(function)
 
 		rw.Write([]byte("Deploying your function..."))
-
+		fmt.Println("deploying your function")
 		// Watch status
 		// watch for 1 min and then close everything
 
@@ -250,6 +255,7 @@ func (f *FunctionHandler) DeployFunction(rw http.ResponseWriter, r *http.Request
 
 		function.DeployFailReason = result.Reason
 		function.DeployStatus = result.Status
+		function.LastAction = string(constants.DeployAction)
 		f.service.SaveFunction(function)
 
 		// TODO: register with the custom router
@@ -306,8 +312,8 @@ func (f *FunctionHandler) CreateFunction(rw http.ResponseWriter, r *http.Request
 	Registry := os.Getenv("REGISTRY")
 	Project := os.Getenv("PROJECT_NAME")
 
-	// imageName := Registry + "/" + Project + "/" + function.ID.String() + ":latest"
-	imageName := Registry + "/" + Project + "/" + "test1" + ":latest"
+	imageName := Registry + "/" + Project + "/" + function.ID.String() + ":latest"
+	// imageName := Registry + "/" + Project + "/" + "test1" + ":latest"
 	fmt.Printf("imageName: %v\n", imageName)
 	namespace, err := f.kw.CreateNamespace(r.Context(), constants.Namespace)
 
@@ -347,6 +353,7 @@ func (f *FunctionHandler) CreateFunction(rw http.ResponseWriter, r *http.Request
 
 	function.BuildFailReason = result.Reason
 	function.BuildStatus = result.Status
+	function.LastAction = string(constants.BuildAction)
 	f.service.SaveFunction(function)
 
 }

@@ -127,7 +127,7 @@ func (fs *FunctionService) WatchDeployment(
 	function *models.Function,
 	namespace string,
 ) WatchResult {
-	watchContext, cancelFunc := context.WithTimeout(context.Background(), 60*time.Second)
+	watchContext, cancelFunc := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancelFunc()
 
 	label, _ := kw.BuildLabel("app", []string{function.ID.String()}) // TODO:
@@ -147,8 +147,9 @@ func (fs *FunctionService) WatchDeployment(
 			p, ok := event.Object.(*appsv1.Deployment)
 			if !ok {
 				fmt.Println("unexpected type")
+				continue
 			}
-
+			fmt.Printf("p: %v\n", p)
 			if p.Status.UpdatedReplicas == *p.Spec.Replicas &&
 				p.Status.Replicas == *p.Spec.Replicas &&
 				p.Status.AvailableReplicas == *p.Spec.Replicas &&
@@ -159,6 +160,7 @@ func (fs *FunctionService) WatchDeployment(
 					fs.l.Print("Deployment Available")
 				}
 				dataChan <- WatchResult{Status: string(constants.Deployed), Err: nil}
+				deploymentWatch.Stop()
 				break
 			} else if p.Status.Conditions[0].Type == appsv1.DeploymentProgressing {
 				fs.l.Print("Deployment in Progress")
@@ -166,6 +168,7 @@ func (fs *FunctionService) WatchDeployment(
 				fs.l.Print("Replica failure. Reason : ", p.Status.Conditions[0].Message)
 				dataChan <- WatchResult{Status: string(constants.DeploymentFailed), Reason: p.Status.Conditions[0].Message, Err: nil}
 				fs.SaveFunction(function)
+				deploymentWatch.Stop()
 				break
 
 			}
@@ -208,6 +211,7 @@ func (fs *FunctionService) WatchImageBuilder(
 			p, ok := event.Object.(*corev1.Pod)
 			if !ok {
 				fmt.Println("unexpected type")
+				continue
 			}
 			// Check Pod Phase. If its failed or succeeded.
 			switch p.Status.Phase {
@@ -220,8 +224,8 @@ func (fs *FunctionService) WatchImageBuilder(
 			case corev1.PodFailed:
 				// TODO: Commit status to DB with message
 				fmt.Println("Image build failed. Reason : ", p.Status.Message)
-				podWatch.Stop()
 				dataChan <- WatchResult{Status: string(constants.BuildFailed), Reason: p.Status.Message, Err: nil}
+				podWatch.Stop()
 				break
 			}
 		}

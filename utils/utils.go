@@ -8,7 +8,7 @@ import "net/http"
 func BuildImageName(functionId string) string {
 	// TODO: implement this
 	Registry := "ghcr.io"
-	Project := ""
+	Project := "cloudbase-project"
 
 	imageName := Registry + "/" + Project + "/" + functionId + ":latest"
 	return imageName
@@ -18,7 +18,7 @@ func BuildImageName(functionId string) string {
 //
 // eg: 127319ey71e291y2e12e01u-srv
 func BuildServiceName(functionId string) string {
-	return functionId + "-srv"
+	return "cloudbase-serverless-" + functionId + "-srv"
 }
 
 // set http headers

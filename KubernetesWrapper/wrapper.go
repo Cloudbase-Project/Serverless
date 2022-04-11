@@ -105,16 +105,9 @@ func (kw *KubernetesWrapper) CreateImageBuilder(ib *ImageBuilder) (*corev1.Pod, 
 	// 	Dockerfile = constants.GolangDockerfile
 	// }
 
-	fmt.Println("the code : ", ib.Code)
-
 	m1 := regexp.MustCompile(`"`)
 	packagejson := m1.ReplaceAllString(constants.NodejsPackageJSON, `\"`)
 	dockerfile := m1.ReplaceAllString(Dockerfile, `\"`)
-
-	fmt.Println(
-		"THIS IS THE CODE : ",
-		`echo -e  "`+ib.Code+`" >> /workspace/index.js && echo -e "`+dockerfile+`" >> /workspace/Dockerfile && echo -e "`+packagejson+`" >> /workspace/package.json`,
-	)
 
 	REGISTRY := os.Getenv("REGISTRY")
 	BASE64_CREDENTIALS := os.Getenv("BASE64_CREDENTIALS")
@@ -185,7 +178,6 @@ func (kw *KubernetesWrapper) CreateImageBuilder(ib *ImageBuilder) (*corev1.Pod, 
 			},
 		},
 	}, metav1.CreateOptions{})
-	fmt.Printf("pod: %v\n", pod)
 	fmt.Printf("err: %v\n", err)
 	return pod, err
 }
@@ -202,14 +194,16 @@ func (kw *KubernetesWrapper) CreateNamespace(
 }
 
 func (kw *KubernetesWrapper) CreateDeployment(options *DeploymentOptions) (*v1.Deployment, error) {
-
 	return kw.KClient.AppsV1().
 		Deployments(options.Namespace).
 		Create(options.Ctx,
 			&v1.Deployment{
 				TypeMeta: metav1.TypeMeta{Kind: "Deployment", APIVersion: "apps/v1"},
 				// TODO:
-				ObjectMeta: metav1.ObjectMeta{Name: options.FunctionId},
+				ObjectMeta: metav1.ObjectMeta{
+					Name:   options.FunctionId,
+					Labels: map[string]string{"app": options.FunctionId},
+				},
 				Spec: v1.DeploymentSpec{
 					Selector: &metav1.LabelSelector{
 						// TODO:

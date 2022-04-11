@@ -243,8 +243,14 @@ func (f *FunctionHandler) DeployFunction(rw http.ResponseWriter, r *http.Request
 		function.DeployStatus = string(constants.Deploying)
 		f.service.SaveFunction(function)
 
-		rw.Write([]byte("Deploying your function..."))
-		fmt.Println("deploying your function")
+		// rw.Write([]byte("Deploying your function..."))
+		rw = utils.SetSSEHeaders(rw)
+		fmt.Fprintf(rw, "data: %v\n\n", "Deploying your function...")
+
+		if f, ok := rw.(http.Flusher); ok {
+			f.Flush()
+		}
+
 		// Watch status
 		// watch for 1 min and then close everything
 
@@ -259,6 +265,7 @@ func (f *FunctionHandler) DeployFunction(rw http.ResponseWriter, r *http.Request
 		f.service.SaveFunction(function)
 
 		// TODO: register with the custom router
+		fmt.Fprintf(rw, "data: %v\n\n", "Deployed your function successfully")
 
 	} else {
 		http.Error(rw, "Cannot perform this action currently", 400)
@@ -343,7 +350,14 @@ func (f *FunctionHandler) CreateFunction(rw http.ResponseWriter, r *http.Request
 
 	// podLogs = clientset.CoreV1().Pods("serverless").GetLogs("kaniko-worker", &v1.PodLogOptions{})
 
-	rw.Write([]byte("Building Image for your code"))
+	rw = utils.SetSSEHeaders(rw)
+
+	// rw.Write([]byte("Building Image for your code"))
+	fmt.Fprintf(rw, "data: %v\n\n", "Building Image for your code")
+
+	if f, ok := rw.(http.Flusher); ok {
+		f.Flush()
+	}
 
 	result := f.service.WatchImageBuilder(f.kw, function, constants.Namespace)
 	if result.Err != nil {
@@ -359,7 +373,8 @@ func (f *FunctionHandler) CreateFunction(rw http.ResponseWriter, r *http.Request
 	function.BuildStatus = result.Status
 	function.LastAction = string(constants.BuildAction)
 	f.service.SaveFunction(function)
-
+	// rw.Write([]byte("Built image"))
+	fmt.Fprintf(rw, "data: %v\n\n", "Built Image")
 }
 
 func (f *FunctionHandler) RedeployFunction(rw http.ResponseWriter, r *http.Request) {

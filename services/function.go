@@ -15,6 +15,7 @@ import (
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	v1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
 type FunctionService struct {
@@ -282,4 +283,11 @@ func (fs *FunctionService) GetDeploymentLogs(kw *kuberneteswrapper.KubernetesWra
 
 	podLogs, err := req.Stream(ctx)
 	return podLogs, err
+}
+
+func (fs *FunctionService) DeleteImageBuilder(
+	kw *kuberneteswrapper.KubernetesWrapper,
+	ctx context.Context, namespace string,
+) error {
+	return kw.KClient.CoreV1().Pods(namespace).Delete(ctx, "kaniko-worker", metav1.DeleteOptions{})
 }

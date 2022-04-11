@@ -351,6 +351,10 @@ func (f *FunctionHandler) CreateFunction(rw http.ResponseWriter, r *http.Request
 		fmt.Println("err : ", result.Err.Error())
 	}
 
+	err = f.service.DeleteImageBuilder(f.kw, r.Context(), constants.Namespace)
+	if err != nil {
+		fmt.Printf("err deleting image builder: %v\n", err.Error())
+	}
 	function.BuildFailReason = result.Reason
 	function.BuildStatus = result.Status
 	function.LastAction = string(constants.BuildAction)

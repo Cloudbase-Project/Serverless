@@ -1,7 +1,6 @@
 package handlers
 
 import (
-	"bytes"
 	"context"
 	"encoding/json"
 	"fmt"
@@ -13,6 +12,7 @@ import (
 	kuberneteswrapper "github.com/Cloudbase-Project/serverless/KubernetesWrapper"
 	"github.com/Cloudbase-Project/serverless/constants"
 	"github.com/Cloudbase-Project/serverless/dtos"
+	"github.com/Cloudbase-Project/serverless/models"
 	"github.com/Cloudbase-Project/serverless/services"
 	"github.com/Cloudbase-Project/serverless/utils"
 	"github.com/gorilla/mux"
@@ -164,27 +164,30 @@ func (f *FunctionHandler) GetFunctionLogs(rw http.ResponseWriter, r *http.Reques
 		http.Error(rw, "Error getting function, "+err.Error(), 400)
 	}
 
-	if function.DeployStatus == string(constants.Deployed) &&
-		function.LastAction != string(constants.DeployAction) {
-		// get the logs for the given function
+	fmt.Printf("function: %v\n", function)
 
-		podLogs, err := f.service.GetDeploymentLogs(
+	if function.DeployStatus == string(constants.Deployed) &&
+		function.LastAction == string(constants.DeployAction) {
+		// get the logs for the given function
+		err := f.service.GetDeploymentLogs(
 			f.kw,
 			r.Context(),
 			constants.Namespace,
 			function.ID.String(),
 			true,
+			rw,
 		)
 		if err != nil {
 			http.Error(rw, "Error getting logs"+err.Error(), 500)
 		}
-		defer podLogs.Close()
+		// fmt.Printf("podLogs: %v\n", podLogs)
+		// defer podLogs.Close()
 
-		rw = utils.SetSSEHeaders(rw)
+		// rw = utils.SetSSEHeaders(rw)
 
-		buf := new(bytes.Buffer)
-		_, err = io.Copy(buf, podLogs)
-		fmt.Fprintf(rw, "data: %v\n\n", buf.String())
+		// buf := new(bytes.Buffer)
+		// _, err = io.Copy(buf, podLogs)
+		// fmt.Fprintf(rw, "data: %v\n\n", buf.String())
 		if f, ok := rw.(http.Flusher); ok {
 			f.Flush()
 		}
@@ -373,8 +376,15 @@ func (f *FunctionHandler) CreateFunction(rw http.ResponseWriter, r *http.Request
 	function.BuildStatus = result.Status
 	function.LastAction = string(constants.BuildAction)
 	f.service.SaveFunction(function)
-	// rw.Write([]byte("Built image"))
-	fmt.Fprintf(rw, "data: %v\n\n", "Built Image")
+	resp := struct {
+		Function models.Function
+		Message  string
+	}{
+		Function: *function,
+		Message:  "Built image for function",
+	}
+
+	json.NewEncoder(rw).Encode(resp)
 }
 
 func (f *FunctionHandler) RedeployFunction(rw http.ResponseWriter, r *http.Request) {

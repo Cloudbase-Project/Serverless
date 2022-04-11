@@ -6,6 +6,8 @@ import (
 	"fmt"
 	"io"
 	"log"
+	"net/http"
+	"sync"
 	"time"
 
 	kuberneteswrapper "github.com/Cloudbase-Project/serverless/KubernetesWrapper"
@@ -16,6 +18,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/client-go/rest"
 )
 
 type FunctionService struct {
@@ -273,16 +276,81 @@ func (fs *FunctionService) DeleteFunctionResources(
 	return nil
 }
 
-func (fs *FunctionService) GetDeploymentLogs(kw *kuberneteswrapper.KubernetesWrapper,
+func (fs *FunctionService) GetDeploymentLogs(
+	kw *kuberneteswrapper.KubernetesWrapper,
 	ctx context.Context,
-	namespace string, deploymentName string, follow bool) (io.ReadCloser, error) {
+	namespace string,
+	deploymentName string,
+	follow bool,
+	rw http.ResponseWriter,
+) error {
 
-	req := kw.KClient.CoreV1().
+	label, _ := kw.BuildLabel("app", []string{deploymentName}) // TODO:
+
+	pods, err := kw.KClient.CoreV1().
 		Pods(namespace).
-		GetLogs("deployment/"+deploymentName, &v1.PodLogOptions{Follow: follow})
+		List(ctx, metav1.ListOptions{LabelSelector: label.String()})
 
-	podLogs, err := req.Stream(ctx)
-	return podLogs, err
+	// req := kw.KClient.CoreV1().Pods(namespace).
+	// 	// GetLogs("deployment/"+deploymentName, &v1.PodLogOptions{Follow: follow})
+	// 	GetLogs("fa1f1dbf-aff3-424c-848a-68303a541ad3-7c94c475d9-l2652", &v1.PodLogOptions{Follow: false})
+
+	var requests []struct {
+		Request *rest.Request
+		PodName string
+	}
+	for _, pod := range pods.Items {
+		podlog := kw.KClient.CoreV1().
+			Pods(namespace).
+			GetLogs(pod.Name, &v1.PodLogOptions{Follow: true})
+		requests = append(requests, struct {
+			Request *rest.Request
+			PodName string
+		}{Request: podlog, PodName: pod.Name})
+	}
+
+	wg := &sync.WaitGroup{}
+	wg.Add(len(requests))
+	fmt.Println("here after requests : ", requests)
+	for _, request := range requests {
+		fmt.Println("for each loop")
+		go func(req *rest.Request, podName string) {
+			defer wg.Done()
+			fmt.Println("inside gooroute")
+			stream, err := req.Stream(ctx)
+			if err != nil {
+				return
+			}
+			defer stream.Close()
+			for {
+				buf := make([]byte, 2000)
+				numBytes, err := stream.Read(buf)
+				if err == io.EOF {
+					break
+				}
+				if err != nil {
+					return
+				}
+				if numBytes == 0 {
+					time.Sleep(1 * time.Second)
+					continue
+				}
+				message := string(buf[:numBytes])
+				fmt.Print("mesasge : ", message)
+				fmt.Fprintf(rw, "data: %v %v\n\n", podName, message)
+				if f, ok := rw.(http.Flusher); ok {
+					f.Flush()
+				}
+			}
+			return
+		}(request.Request, request.PodName)
+	}
+	fmt.Println("huehrue")
+	wg.Wait()
+	fmt.Println("here")
+	// podLogs, err := req.Stream(ctx)
+	// l := req.Do(ctx)
+	return err
 }
 
 func (fs *FunctionService) DeleteImageBuilder(

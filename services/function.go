@@ -311,12 +311,9 @@ func (fs *FunctionService) GetDeploymentLogs(
 
 	wg := &sync.WaitGroup{}
 	wg.Add(len(requests))
-	fmt.Println("here after requests : ", requests)
 	for _, request := range requests {
-		fmt.Println("for each loop")
 		go func(req *rest.Request, podName string) {
 			defer wg.Done()
-			fmt.Println("inside gooroute")
 			stream, err := req.Stream(ctx)
 			if err != nil {
 				return
@@ -336,7 +333,6 @@ func (fs *FunctionService) GetDeploymentLogs(
 					continue
 				}
 				message := string(buf[:numBytes])
-				fmt.Print("mesasge : ", message)
 				fmt.Fprintf(rw, "data: %v %v\n\n", podName, message)
 				if f, ok := rw.(http.Flusher); ok {
 					f.Flush()
@@ -345,9 +341,7 @@ func (fs *FunctionService) GetDeploymentLogs(
 			return
 		}(request.Request, request.PodName)
 	}
-	fmt.Println("huehrue")
 	wg.Wait()
-	fmt.Println("here")
 	// podLogs, err := req.Stream(ctx)
 	// l := req.Do(ctx)
 	return err

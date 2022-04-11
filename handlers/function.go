@@ -164,8 +164,6 @@ func (f *FunctionHandler) GetFunctionLogs(rw http.ResponseWriter, r *http.Reques
 		http.Error(rw, "Error getting function, "+err.Error(), 400)
 	}
 
-	fmt.Printf("function: %v\n", function)
-
 	if function.DeployStatus == string(constants.Deployed) &&
 		function.LastAction == string(constants.DeployAction) {
 		// get the logs for the given function
@@ -180,14 +178,7 @@ func (f *FunctionHandler) GetFunctionLogs(rw http.ResponseWriter, r *http.Reques
 		if err != nil {
 			http.Error(rw, "Error getting logs"+err.Error(), 500)
 		}
-		// fmt.Printf("podLogs: %v\n", podLogs)
-		// defer podLogs.Close()
 
-		// rw = utils.SetSSEHeaders(rw)
-
-		// buf := new(bytes.Buffer)
-		// _, err = io.Copy(buf, podLogs)
-		// fmt.Fprintf(rw, "data: %v\n\n", buf.String())
 		if f, ok := rw.(http.Flusher); ok {
 			f.Flush()
 		}
@@ -297,10 +288,7 @@ func (f *FunctionHandler) CreateFunction(rw http.ResponseWriter, r *http.Request
 	// TODO: 3. save code to db
 
 	var data *dtos.PostCodeDTO
-	fmt.Printf("r.Body: %v\n", r.Body)
 	fromJSON(r.Body, &data)
-	fmt.Printf("data: %v\n", data)
-	fmt.Println(":daa : ", data)
 	if _, err := dtos.Validate(data); err != nil {
 		http.Error(rw, "Validation error : "+err.Error(), 400)
 		return
@@ -325,7 +313,7 @@ func (f *FunctionHandler) CreateFunction(rw http.ResponseWriter, r *http.Request
 	imageName := Registry + "/" + Project + "/" + function.ID.String() + ":latest"
 	// imageName := Registry + "/" + Project + "/" + "test1" + ":latest"
 	fmt.Printf("imageName: %v\n", imageName)
-	namespace, err := f.kw.CreateNamespace(r.Context(), constants.Namespace)
+	// _, err := f.kw.CreateNamespace(r.Context(), constants.Namespace)
 
 	// create namespace if not exist
 	if err != nil {
@@ -333,7 +321,6 @@ func (f *FunctionHandler) CreateFunction(rw http.ResponseWriter, r *http.Request
 		fmt.Println("namespace already exists. ignoring...")
 		fmt.Printf("err: %v\n", err)
 	}
-	fmt.Printf("namespace: %v\n", namespace)
 
 	// create kaniko pod
 

@@ -30,8 +30,6 @@ func main() {
 	if err != nil {
 		logger.Fatal("Cannot load env variables")
 	}
-	x := os.Environ()
-	fmt.Printf("x: %v\n", x)
 
 	PORT, ok := os.LookupEnv("PORT")
 	if !ok {

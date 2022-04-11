@@ -13,7 +13,7 @@ import (
 type Functions []*Function
 
 type Function struct {
-	ID               uuid.UUID      `gorm:"type:uuid;default:uuid_generate_v4();primaryKey" json:"asdid"`
+	ID               uuid.UUID      `gorm:"type:uuid;default:uuid_generate_v4();primaryKey" json:"id"`
 	CreatedAt        time.Time      `                                                       json:"-"`      // auto populated by gorm
 	UpdatedAt        time.Time      `                                                       json:"-"`      // auto populated by gorm
 	DeletedAt        gorm.DeletedAt `gorm:"index"                                           json:"-"`      // auto populated by gorm

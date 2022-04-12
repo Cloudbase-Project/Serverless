@@ -35,7 +35,6 @@ func main() {
 	if !ok {
 		PORT = "3000"
 	}
-	logger.Println("hello world runnign boid")
 
 	router := mux.NewRouter()
 

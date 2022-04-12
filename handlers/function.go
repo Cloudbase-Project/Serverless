@@ -288,9 +288,11 @@ func (f *FunctionHandler) CreateFunction(rw http.ResponseWriter, r *http.Request
 		return
 	}
 
+	ownerId := r.Context().Value("ownerId").(string)
+
 	// Commit to db
 	// TODO:
-	function, err := f.service.CreateFunction(data.Code, data.Language, "userId")
+	function, err := f.service.CreateFunction(data.Code, data.Language, ownerId)
 	if err != nil {
 		http.Error(rw, "DB error", 500)
 	}

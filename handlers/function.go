@@ -4,7 +4,6 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"io"
 	"log"
 	"net/http"
 	"os"
@@ -34,11 +33,6 @@ func NewFunctionHandler(
 ) *FunctionHandler {
 	kw := kuberneteswrapper.NewWrapper(client)
 	return &FunctionHandler{l: l, service: s, kw: kw}
-}
-
-func fromJSON(body io.Reader, value interface{}) interface{} {
-	d := json.NewDecoder(body)
-	return d.Decode(value)
 }
 
 // Get all functions created by this user.
@@ -78,7 +72,7 @@ func (f *FunctionHandler) UpdateFunction(rw http.ResponseWriter, r *http.Request
 	vars := mux.Vars(r)
 
 	var data *dtos.UpdateCodeDTO
-	fromJSON(r.Body, data)
+	utils.FromJSON(r.Body, data)
 
 	if _, err := dtos.Validate(data); err != nil {
 		http.Error(rw, "Validation error", 400)
@@ -288,7 +282,7 @@ func (f *FunctionHandler) CreateFunction(rw http.ResponseWriter, r *http.Request
 	// TODO: 3. save code to db
 
 	var data *dtos.PostCodeDTO
-	fromJSON(r.Body, &data)
+	utils.FromJSON(r.Body, &data)
 	if _, err := dtos.Validate(data); err != nil {
 		http.Error(rw, "Validation error : "+err.Error(), 400)
 		return

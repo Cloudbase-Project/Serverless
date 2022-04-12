@@ -1,6 +1,10 @@
 package utils
 
-import "net/http"
+import (
+	"encoding/json"
+	"io"
+	"net/http"
+)
 
 // returns a fully qualified image name given a function id.
 //
@@ -12,6 +16,11 @@ func BuildImageName(functionId string) string {
 
 	imageName := Registry + "/" + Project + "/" + functionId + ":latest"
 	return imageName
+}
+
+func FromJSON(body io.Reader, value interface{}) interface{} {
+	d := json.NewDecoder(body)
+	return d.Decode(value)
 }
 
 // returns a service name given a functionId

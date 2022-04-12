@@ -26,3 +26,12 @@ func (cs *ConfigService) CreateConfig(
 	fmt.Printf("config created: %v\n", &result)
 	return &config
 }
+
+func (cs *ConfigService) ToggleService(projectId string, ownerId string) (*models.Config, error) {
+	var config models.Config
+
+	if err := cs.db.Where(&models.Config{Owner: ownerId, ProjectId: projectId}, &config).Error; err != nil {
+		return nil, err
+	}
+	return &config, nil
+}

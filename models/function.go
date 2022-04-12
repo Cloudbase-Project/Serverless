@@ -25,6 +25,8 @@ type Function struct {
 	DeployStatus     string         `gorm:"default:'NotDeployed'"                           json:"deployStatus"`
 	DeployFailReason string         `                                                       json:"deployFailReason"`
 	LastAction       string         `gorm:"default:'Create'"                                json:"lastAction"`
+	ConfigID         uuid.UUID
+	Config           Config
 }
 
 func (f *Functions) ToJSON(w io.Writer) error {

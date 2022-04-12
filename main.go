@@ -70,12 +70,13 @@ func main() {
 
 	}
 
-	db.AutoMigrate(&models.Function{})
+	db.AutoMigrate(&models.Function{}, &models.Config{})
 
 	fs := services.NewFunctionService(db, logger)
+	cs := services.NewConfigService(db, logger)
 
 	function := handlers.NewFunctionHandler(clientset, logger, fs)
-
+	configHandler := handlers.NewConfigHandler(logger, cs)
 	// add function
 	router.HandleFunc("/function", function.CreateFunction).Methods(http.MethodPost)
 
@@ -99,6 +100,9 @@ func main() {
 
 	router.HandleFunc("/function/{codeId}/redeploy", function.RedeployFunction).
 		Methods(http.MethodPost)
+
+		// ------------------ CONFIG ROUTES
+	router.HandleFunc("/config/", configHandler.CreateConfig).Methods(http.MethodPost)
 
 	server := http.Server{
 		Addr:    ":" + PORT,

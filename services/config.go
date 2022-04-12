@@ -14,8 +14,8 @@ type ConfigService struct {
 	l  *log.Logger
 }
 
-func NewConfigService(db *gorm.DB, l *log.Logger) *FunctionService {
-	return &FunctionService{db: db, l: l}
+func NewConfigService(db *gorm.DB, l *log.Logger) *ConfigService {
+	return &ConfigService{db: db, l: l}
 }
 
 func (cs *ConfigService) CreateConfig(

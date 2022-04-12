@@ -33,5 +33,7 @@ func (cs *ConfigService) ToggleService(projectId string, ownerId string) (*model
 	if err := cs.db.Where(&models.Config{Owner: ownerId, ProjectId: projectId}, &config).Error; err != nil {
 		return nil, err
 	}
+	config.Enabled = !config.Enabled
+	cs.db.Save(&config)
 	return &config, nil
 }

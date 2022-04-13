@@ -36,11 +36,20 @@ func NewFunctionService(db *gorm.DB, l *log.Logger) *FunctionService {
 	return &FunctionService{db: db, l: l}
 }
 
-func (fs *FunctionService) GetAllFunctions() (*models.Functions, error) {
+func (fs *FunctionService) GetAllFunctions(
+	ownerId string,
+	projectId string,
+) (*models.Functions, error) {
 
 	var functions models.Functions
+	var config models.Config
+	result := fs.db.Where("ownerId = ? AND projectId = ?", ownerId, projectId).First(&config)
 
-	if err := fs.db.Where("userId = ?").Find(&functions).Error; err != nil {
+	if errors.Is(result.Error, gorm.ErrRecordNotFound) {
+		return nil, errors.New("Invalid projectId")
+	}
+
+	if err := fs.db.Where("ConfigID = ?").Find(&functions).Error; err != nil {
 		return nil, err
 	}
 

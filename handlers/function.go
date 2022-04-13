@@ -38,9 +38,14 @@ func NewFunctionHandler(
 // Get all functions created by this user.
 func (f *FunctionHandler) ListFunctions(rw http.ResponseWriter, r *http.Request) {
 
-	functions, err := f.service.GetAllFunctions()
+	ownerId := r.Context().Value("ownerId").(string)
+	vars := mux.Vars(r)
+
+	projectId := vars["projectId"]
+
+	functions, err := f.service.GetAllFunctions(ownerId, projectId)
 	if err != nil {
-		http.Error(rw, "DB error", 500)
+		http.Error(rw, err.Error(), 500)
 	}
 
 	err = functions.ToJSON(rw)

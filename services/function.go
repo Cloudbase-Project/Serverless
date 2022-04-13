@@ -43,7 +43,8 @@ func (fs *FunctionService) GetAllFunctions(
 
 	var functions models.Functions
 	var config models.Config
-	result := fs.db.Where("ownerId = ? AND projectId = ?", ownerId, projectId).First(&config)
+	// result := fs.db.Where("owner = ? AND projectId = ?", ownerId, projectId).First(&config)
+	result := fs.db.Where(&models.Config{Owner: ownerId, ProjectId: projectId}).First(&config)
 
 	if errors.Is(result.Error, gorm.ErrRecordNotFound) {
 		return nil, errors.New("Invalid projectId")
@@ -67,7 +68,8 @@ func (fs *FunctionService) GetFunction(
 	var function models.Function
 	var config models.Config
 
-	result := fs.db.Where("ownerId = ? AND projectId = ?", ownerId, projectId).First(&config)
+	// result := fs.db.Where("owner = ? AND projectId = ?", ownerId, projectId).First(&config)
+	result := fs.db.Where(&models.Config{Owner: ownerId, ProjectId: projectId}).First(&config)
 
 	if errors.Is(result.Error, gorm.ErrRecordNotFound) {
 		return nil, errors.New("Invalid projectId")
@@ -96,7 +98,14 @@ func (fs *FunctionService) CreateFunction(
 
 	var config models.Config
 
-	result := fs.db.Where("ownerId = ? AND projectId = ?", ownerId, projectId).First(&config)
+	var configs []models.Config
+
+	fs.db.Find(&configs)
+	fmt.Printf("configs.owner: %v\n", configs[0].Owner)
+	fmt.Printf("configs.projectid: %v\n", configs[0].ProjectId)
+
+	// result := fs.db.Where("owner = ?", ownerId, projectId).First(&config)
+	result := fs.db.Where(&models.Config{Owner: ownerId, ProjectId: projectId}).First(&config)
 
 	if errors.Is(result.Error, gorm.ErrRecordNotFound) {
 		return nil, errors.New("Invalid projectId")
@@ -126,7 +135,8 @@ func (fs *FunctionService) DeleteFunction(codeId string, ownerId string, project
 
 	var config models.Config
 
-	result := fs.db.Where("ownerId = ? AND projectId = ?", ownerId, projectId).First(&config)
+	// result := fs.db.Where("owner = ? AND projectId = ?", ownerId, projectId).First(&config)
+	result := fs.db.Where(&models.Config{Owner: ownerId, ProjectId: projectId}).First(&config)
 
 	if errors.Is(result.Error, gorm.ErrRecordNotFound) {
 		return errors.New("Invalid projectId")

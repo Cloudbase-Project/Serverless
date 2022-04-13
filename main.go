@@ -18,6 +18,7 @@ import (
 	"k8s.io/client-go/rest"
 
 	"github.com/Cloudbase-Project/serverless/handlers"
+	"github.com/Cloudbase-Project/serverless/middlewares"
 	"github.com/Cloudbase-Project/serverless/models"
 	"github.com/Cloudbase-Project/serverless/services"
 )
@@ -77,27 +78,34 @@ func main() {
 	function := handlers.NewFunctionHandler(clientset, logger, fs)
 	configHandler := handlers.NewConfigHandler(logger, cs)
 	// add function
-	router.HandleFunc("/function", function.CreateFunction).Methods(http.MethodPost)
+	router.HandleFunc("/function/{projectId}", middlewares.AuthMiddleware(function.CreateFunction)).
+		Methods(http.MethodPost)
 
 	// list functions created by the user
-	router.HandleFunc("/functions", function.ListFunctions).Methods(http.MethodGet)
+	router.HandleFunc("/functions/{projectId}", middlewares.AuthMiddleware(function.ListFunctions)).
+		Methods(http.MethodGet)
 
 	// update function
-	router.HandleFunc("/function/{codeId}", function.UpdateFunction).Methods(http.MethodPatch)
+	router.HandleFunc("/function/{projectId}/{codeId}/", middlewares.AuthMiddleware(function.UpdateFunction)).
+		Methods(http.MethodPatch)
 
 	// delete function
-	router.HandleFunc("/function/{codeId}", function.DeleteFunction).Methods(http.MethodDelete)
+	router.HandleFunc("/function/{projectId}/{codeId}", middlewares.AuthMiddleware(function.DeleteFunction)).
+		Methods(http.MethodDelete)
 
 	// View a function. View status/replicas RPS etc
-	router.HandleFunc("/function/{codeId}", function.GetFunction).Methods(http.MethodGet)
+	router.HandleFunc("/function/{projectId}/{codeId}", middlewares.AuthMiddleware(function.GetFunction)).
+		Methods(http.MethodGet)
 
 	// Get logs of a function
-	router.HandleFunc("/function/{codeId}/logs", function.GetFunctionLogs).Methods(http.MethodGet)
+	router.HandleFunc("/function/{projectId}/{codeId}/logs", middlewares.AuthMiddleware(function.GetFunctionLogs)).
+		Methods(http.MethodGet)
 
 	// Create function creates function image. User has to deploy/redeploy for deployments to take effect.
-	router.HandleFunc("/function/{codeId}/deploy", function.DeployFunction).Methods(http.MethodPost)
+	router.HandleFunc("/function/{projectId}/{codeId}/deploy", middlewares.AuthMiddleware(function.DeployFunction)).
+		Methods(http.MethodPost)
 
-	router.HandleFunc("/function/{codeId}/redeploy", function.RedeployFunction).
+	router.HandleFunc("/function/{projectId}/{codeId}/redeploy", middlewares.AuthMiddleware(function.RedeployFunction)).
 		Methods(http.MethodPost)
 
 		// ------------------ CONFIG ROUTES

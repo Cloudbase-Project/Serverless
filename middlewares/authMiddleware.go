@@ -16,7 +16,7 @@ func AuthMiddleware(
 	return http.HandlerFunc(func(rw http.ResponseWriter, r *http.Request) {
 
 		fmt.Println("hello from the auth middleware")
-		token := r.Header.Get("Authorization")
+		token := r.Header.Get("owner")
 		if token == "" {
 			// http.Error(rw, "Token missing", 40s1)
 			rw.Header().Set("Content-Type", "application/json")
@@ -28,7 +28,9 @@ func AuthMiddleware(
 
 		tokenData, err := jwt.Parse(
 			token,
-			func(t *jwt.Token) (interface{}, error) { return os.Getenv("MAIN_SECRET_TOKEN"), nil },
+			func(t *jwt.Token) (interface{}, error) {
+				return []byte(os.Getenv("MAIN_SECRET_TOKEN")), nil
+			},
 		)
 		fmt.Printf("tokenData: %v\n", tokenData)
 		if err != nil {

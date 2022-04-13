@@ -21,7 +21,11 @@ func NewConfigService(db *gorm.DB, l *log.Logger) *ConfigService {
 func (cs *ConfigService) CreateConfig(
 	CreateConfigDTO *dtos.CreateConfigDTO,
 ) *models.Config {
-	config := models.Config{Owner: CreateConfigDTO.Owner, ProjectId: CreateConfigDTO.ProjectId}
+	config := models.Config{
+		Owner:     CreateConfigDTO.Owner,
+		ProjectId: CreateConfigDTO.ProjectId,
+		Enabled:   true,
+	}
 	result := cs.db.Create(&config)
 	fmt.Printf("config created: %v\n", &result)
 	return &config

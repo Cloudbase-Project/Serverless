@@ -56,12 +56,14 @@ func (f *FunctionHandler) ListFunctions(rw http.ResponseWriter, r *http.Request)
 
 // Get a function given a "codeId" in the route params
 func (f *FunctionHandler) GetFunction(rw http.ResponseWriter, r *http.Request) {
+	ownerId := r.Context().Value("ownerId").(string)
 
 	vars := mux.Vars(r)
+	projectId := vars["projectId"]
 
-	function, err := f.service.GetFunction(vars["codeId"])
+	function, err := f.service.GetFunction(vars["codeId"], ownerId, projectId)
 	if err != nil {
-		http.Error(rw, "DB error", 500)
+		http.Error(rw, err.Error(), 500)
 	}
 
 	err = function.ToJSON(rw)
@@ -74,7 +76,10 @@ func (f *FunctionHandler) UpdateFunction(rw http.ResponseWriter, r *http.Request
 	// set status to readyToDeploy
 	// set LastAction to update
 
+	ownerId := r.Context().Value("ownerId").(string)
+
 	vars := mux.Vars(r)
+	projectId := vars["projectId"]
 
 	var data *dtos.UpdateCodeDTO
 	utils.FromJSON(r.Body, data)
@@ -85,9 +90,9 @@ func (f *FunctionHandler) UpdateFunction(rw http.ResponseWriter, r *http.Request
 	}
 
 	// get the function.
-	function, err := f.service.GetFunction(vars["codeId"])
+	function, err := f.service.GetFunction(vars["codeId"], ownerId, projectId)
 	if err != nil {
-		http.Error(rw, "DB error", 500)
+		http.Error(rw, err.Error(), 500)
 
 	}
 
@@ -130,9 +135,12 @@ func (f *FunctionHandler) DeleteFunction(rw http.ResponseWriter, r *http.Request
 	vars := mux.Vars(r)
 
 	codeId := vars["codeId"]
+	ownerId := r.Context().Value("ownerId").(string)
+
+	projectId := vars["projectId"]
 
 	// delete it.
-	err := f.service.DeleteFunction(codeId)
+	err := f.service.DeleteFunction(codeId, ownerId, projectId)
 	if err != nil {
 		f.l.Print(err)
 		http.Error(rw, "DB error", 500)
@@ -157,8 +165,12 @@ func (f *FunctionHandler) DeleteFunction(rw http.ResponseWriter, r *http.Request
 func (f *FunctionHandler) GetFunctionLogs(rw http.ResponseWriter, r *http.Request) {
 	vars := mux.Vars(r)
 
+	ownerId := r.Context().Value("ownerId").(string)
+
+	projectId := vars["projectId"]
+
 	// get function
-	function, err := f.service.GetFunction(vars["codeId"])
+	function, err := f.service.GetFunction(vars["codeId"], ownerId, projectId)
 	if err != nil {
 		http.Error(rw, "Error getting function, "+err.Error(), 400)
 	}
@@ -199,8 +211,11 @@ func (f *FunctionHandler) DeployFunction(rw http.ResponseWriter, r *http.Request
 
 	//  Get function from db.
 	vars := mux.Vars(r)
+	ownerId := r.Context().Value("ownerId").(string)
 
-	function, err := f.service.GetFunction(vars["codeId"])
+	projectId := vars["projectId"]
+
+	function, err := f.service.GetFunction(vars["codeId"], ownerId, projectId)
 	if err != nil {
 		http.Error(rw, "DB error", 500)
 	}
@@ -295,9 +310,12 @@ func (f *FunctionHandler) CreateFunction(rw http.ResponseWriter, r *http.Request
 
 	ownerId := r.Context().Value("ownerId").(string)
 
+	vars := mux.Vars(r)
+	projectId := vars["projectId"]
+
 	// Commit to db
 	// TODO:
-	function, err := f.service.CreateFunction(data.Code, data.Language, ownerId)
+	function, err := f.service.CreateFunction(data.Code, data.Language, ownerId, projectId)
 	if err != nil {
 		http.Error(rw, "DB error", 500)
 	}
@@ -377,8 +395,11 @@ func (f *FunctionHandler) CreateFunction(rw http.ResponseWriter, r *http.Request
 
 func (f *FunctionHandler) RedeployFunction(rw http.ResponseWriter, r *http.Request) {
 	vars := mux.Vars(r)
+	ownerId := r.Context().Value("ownerId").(string)
 
-	function, err := f.service.GetFunction(vars["codeId"])
+	projectId := vars["projectId"]
+
+	function, err := f.service.GetFunction(vars["codeId"], ownerId, projectId)
 	if err != nil {
 		http.Error(rw, "DB error", 500)
 	}

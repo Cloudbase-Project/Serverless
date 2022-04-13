@@ -48,6 +48,9 @@ func (fs *FunctionService) GetAllFunctions(
 	if errors.Is(result.Error, gorm.ErrRecordNotFound) {
 		return nil, errors.New("Invalid projectId")
 	}
+	if !config.Enabled {
+		return nil, errors.New("Serverless is disabled")
+	}
 
 	if err := fs.db.Where("ConfigID = ?").Find(&functions).Error; err != nil {
 		return nil, err
@@ -56,8 +59,23 @@ func (fs *FunctionService) GetAllFunctions(
 	return &functions, nil
 }
 
-func (fs *FunctionService) GetFunction(codeId string) (*models.Function, error) {
+func (fs *FunctionService) GetFunction(
+	codeId string,
+	ownerId string,
+	projectId string,
+) (*models.Function, error) {
 	var function models.Function
+	var config models.Config
+
+	result := fs.db.Where("ownerId = ? AND projectId = ?", ownerId, projectId).First(&config)
+
+	if errors.Is(result.Error, gorm.ErrRecordNotFound) {
+		return nil, errors.New("Invalid projectId")
+	}
+	if !config.Enabled {
+		return nil, errors.New("Serverless is disabled")
+	}
+
 	if err := fs.db.First(&function, "id = ?", codeId).Error; err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return nil, nil
@@ -72,15 +90,28 @@ func (fs *FunctionService) GetFunction(codeId string) (*models.Function, error) 
 func (fs *FunctionService) CreateFunction(
 	code string,
 	language constants.Language,
-	userId string,
+	ownerId string,
+	projectId string,
 ) (*models.Function, error) {
 
-	function := models.Function{Code: code, Language: string(language), UserId: userId}
+	var config models.Config
+
+	result := fs.db.Where("ownerId = ? AND projectId = ?", ownerId, projectId).First(&config)
+
+	if errors.Is(result.Error, gorm.ErrRecordNotFound) {
+		return nil, errors.New("Invalid projectId")
+	}
+	if !config.Enabled {
+		return nil, errors.New("Serverless is disabled")
+	}
+
+	function := models.Function{Code: code, Language: string(language), Config: config}
 	// if err := fs.db.Create(&models.Function{Code: code, Language: string(language), UserId: userId, BuildStatus: string(constants.Building)}).Error; err != nil {
 	// 	return nil, err
 	// }
 
-	result := fs.db.Create(&function)
+	fs.db.Create(&function)
+
 	fmt.Printf("result: %v\n", &result)
 	return &function, nil
 }
@@ -90,8 +121,20 @@ func (fs *FunctionService) SaveFunction(function *models.Function) {
 }
 
 // Delete a function with its primary key.
-func (fs *FunctionService) DeleteFunction(codeId string) error {
+func (fs *FunctionService) DeleteFunction(codeId string, ownerId string, projectId string) error {
 	// fs.db.Delete(&Function, "id = ?", codeId)
+
+	var config models.Config
+
+	result := fs.db.Where("ownerId = ? AND projectId = ?", ownerId, projectId).First(&config)
+
+	if errors.Is(result.Error, gorm.ErrRecordNotFound) {
+		return errors.New("Invalid projectId")
+	}
+	if !config.Enabled {
+		return errors.New("Serverless is disabled")
+	}
+
 	if err := fs.db.Where("id = ?", codeId).Delete(&models.Function{}).Error; err != nil {
 		return err
 	}

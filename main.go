@@ -74,9 +74,11 @@ func main() {
 
 	fs := services.NewFunctionService(db, logger)
 	cs := services.NewConfigService(db, logger)
+	ps := services.NewProxyService(db, logger)
 
 	function := handlers.NewFunctionHandler(clientset, logger, fs)
 	configHandler := handlers.NewConfigHandler(logger, cs)
+	proxyHandler := handlers.NewProxyHandler(logger, ps)
 	// add function
 	router.HandleFunc("/function/{projectId}", middlewares.AuthMiddleware(function.CreateFunction)).
 		Methods(http.MethodPost)
@@ -110,6 +112,8 @@ func main() {
 
 		// ------------------ CONFIG ROUTES
 	router.HandleFunc("/config/", configHandler.CreateConfig).Methods(http.MethodPost)
+
+	router.HandleFunc("/serve/{functionId}", proxyHandler.ProxyRequest).Methods(http.MethodGet)
 
 	server := http.Server{
 		Addr:    ":" + PORT,

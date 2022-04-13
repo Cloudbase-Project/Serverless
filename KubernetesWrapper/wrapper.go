@@ -242,7 +242,7 @@ func (kw *KubernetesWrapper) CreateService(options *ServiceOptions) (*corev1.Ser
 				Selector: options.DeploymentLabel,
 				Type:     corev1.ServiceTypeClusterIP,
 				Ports: []corev1.ServicePort{
-					{Port: 3000, TargetPort: intstr.FromInt(3000)},
+					{Port: 4000, TargetPort: intstr.FromInt(4000)},
 				},
 			},
 		}, metav1.CreateOptions{})

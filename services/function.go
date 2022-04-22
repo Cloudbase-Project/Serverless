@@ -53,7 +53,7 @@ func (fs *FunctionService) GetAllFunctions(
 		return nil, errors.New("Serverless is disabled")
 	}
 
-	if err := fs.db.Where("ConfigID = ?").Find(&functions).Error; err != nil {
+	if err := fs.db.Where(&models.Function{ConfigID: config.ID}).Find(&functions).Error; err != nil {
 		return nil, err
 	}
 

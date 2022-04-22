@@ -90,8 +90,6 @@ func (fs *FunctionService) GetFunction(
 
 // Create a function in the db.
 func (fs *FunctionService) CreateFunction(
-	code string,
-	language constants.Language,
 	ownerId string,
 	projectId string,
 ) (*models.Function, error) {
@@ -114,7 +112,7 @@ func (fs *FunctionService) CreateFunction(
 		return nil, errors.New("Serverless is disabled")
 	}
 
-	function := models.Function{Code: code, Language: string(language), Config: config}
+	function := models.Function{Config: config}
 	// if err := fs.db.Create(&models.Function{Code: code, Language: string(language), UserId: userId, BuildStatus: string(constants.Building)}).Error; err != nil {
 	// 	return nil, err
 	// }

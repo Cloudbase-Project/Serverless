@@ -295,35 +295,30 @@ func (f *FunctionHandler) DeployFunction(rw http.ResponseWriter, r *http.Request
 
 }
 
-func (f *FunctionHandler) CreateFunction(rw http.ResponseWriter, r *http.Request) {
-
-	// TODO: 1. authenicate and get userId
-	// TODO: 2. check if the service is enabled
-	// TODO: 3. save code to db
-
-	var data *dtos.PostCodeDTO
+func (f *FunctionHandler) BuildFunction(rw http.ResponseWriter, r *http.Request) {
+	var data *dtos.BuildFunctionDTO
 	utils.FromJSON(r.Body, &data)
 	if _, err := dtos.Validate(data); err != nil {
 		http.Error(rw, "Validation error : "+err.Error(), 400)
 		return
 	}
-
 	ownerId := r.Context().Value("ownerId").(string)
 
 	vars := mux.Vars(r)
 	projectId := vars["projectId"]
 
-	// Commit to db
-	// TODO:
-	function, err := f.service.CreateFunction(data.Code, data.Language, ownerId, projectId)
+	// get the function.
+	function, err := f.service.GetFunction(vars["codeId"], ownerId, projectId)
 	if err != nil {
-		http.Error(rw, "DB error", 500)
+		http.Error(rw, err.Error(), 500)
 	}
-	fmt.Printf("function: %v\n", function)
 
-	// if err != nil {
-	// 	http.Error(rw, "cannot read json", 400)
-	// }
+	// update the code.
+	function.Code = data.Code
+	function.Language = string(data.Language)
+	function.BuildStatus = string(constants.Building)
+	// save it
+	f.service.SaveFunction(function)
 
 	// TODO: get these from env variables
 	Registry := os.Getenv("REGISTRY")
@@ -391,6 +386,32 @@ func (f *FunctionHandler) CreateFunction(rw http.ResponseWriter, r *http.Request
 	}
 
 	json.NewEncoder(rw).Encode(resp)
+
+}
+
+func (f *FunctionHandler) CreateFunction(rw http.ResponseWriter, r *http.Request) {
+
+	// TODO: 1. authenicate and get userId
+	// TODO: 2. check if the service is enabled
+	// TODO: 3. save code to db
+
+	ownerId := r.Context().Value("ownerId").(string)
+
+	vars := mux.Vars(r)
+	projectId := vars["projectId"]
+
+	// Commit to db
+	// TODO:
+	function, err := f.service.CreateFunction(ownerId, projectId)
+	if err != nil {
+		http.Error(rw, "DB error", 500)
+	}
+	fmt.Printf("function: %v\n", function)
+
+	// if err != nil {
+	// 	http.Error(rw, "cannot read json", 400)
+	// }
+	function.ToJSON(rw)
 }
 
 func (f *FunctionHandler) RedeployFunction(rw http.ResponseWriter, r *http.Request) {

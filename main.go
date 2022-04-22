@@ -83,6 +83,9 @@ func main() {
 	router.HandleFunc("/function/{projectId}", middlewares.AuthMiddleware(function.CreateFunction)).
 		Methods(http.MethodPost)
 
+	router.HandleFunc("/function/{projectId}/{codeId}/build", middlewares.AuthMiddleware(function.BuildFunction)).
+		Methods(http.MethodPost)
+
 	// list functions created by the user
 	router.HandleFunc("/functions/{projectId}", middlewares.AuthMiddleware(function.ListFunctions)).
 		Methods(http.MethodGet)

@@ -371,6 +371,7 @@ func (fs *FunctionService) GetDeploymentLogs(
 
 	wg := &sync.WaitGroup{}
 	wg.Add(len(requests))
+	rw.Header().Set("Content-Type", "text/event-stream")
 	for _, request := range requests {
 		go func(req *rest.Request, podName string) {
 			defer wg.Done()

@@ -164,39 +164,40 @@ func (f *FunctionHandler) DeleteFunction(rw http.ResponseWriter, r *http.Request
 
 func (f *FunctionHandler) GetFunctionLogs(rw http.ResponseWriter, r *http.Request) {
 	vars := mux.Vars(r)
+	fmt.Println("hello from the logs function")
+	// ownerId := r.Context().Value("ownerId").(string)
 
-	ownerId := r.Context().Value("ownerId").(string)
-
-	projectId := vars["projectId"]
+	// projectId := vars["projectId"]
 
 	// get function
-	function, err := f.service.GetFunction(vars["codeId"], ownerId, projectId)
+	// function, err := f.service.GetFunction(vars["codeId"], ownerId, projectId)
+	// if err != nil {
+	// 	http.Error(rw, "Error getting function, "+err.Error(), 400)
+	// }
+
+	// if function.DeployStatus == string(constants.Deployed) &&
+	// function.LastAction == string(constants.DeployAction) {
+	// get the logs for the given function
+	err := f.service.GetDeploymentLogs(
+		f.kw,
+		r.Context(),
+		constants.Namespace,
+		// function.ID.String(),
+		vars["codeId"],
+		true,
+		rw,
+	)
 	if err != nil {
-		http.Error(rw, "Error getting function, "+err.Error(), 400)
+		http.Error(rw, "Error getting logs"+err.Error(), 500)
 	}
 
-	if function.DeployStatus == string(constants.Deployed) &&
-		function.LastAction == string(constants.DeployAction) {
-		// get the logs for the given function
-		err := f.service.GetDeploymentLogs(
-			f.kw,
-			r.Context(),
-			constants.Namespace,
-			function.ID.String(),
-			true,
-			rw,
-		)
-		if err != nil {
-			http.Error(rw, "Error getting logs"+err.Error(), 500)
-		}
-
-		if f, ok := rw.(http.Flusher); ok {
-			f.Flush()
-		}
-
-	} else {
-		http.Error(rw, "Cannot perform this action currently", 400)
+	if f, ok := rw.(http.Flusher); ok {
+		f.Flush()
 	}
+
+	// } else {
+	// 	http.Error(rw, "Cannot perform this action currently", 400)
+	// }
 	// check if its deployStatus is deployed
 	// check if lastAction is deploy
 	// check if
@@ -296,6 +297,7 @@ func (f *FunctionHandler) DeployFunction(rw http.ResponseWriter, r *http.Request
 }
 
 func (f *FunctionHandler) BuildFunction(rw http.ResponseWriter, r *http.Request) {
+	fmt.Println("in the function correctly : ")
 	var data *dtos.BuildFunctionDTO
 	utils.FromJSON(r.Body, &data)
 	if _, err := dtos.Validate(data); err != nil {

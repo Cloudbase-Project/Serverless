@@ -83,7 +83,10 @@ func main() {
 	router.HandleFunc("/function/{projectId}", middlewares.AuthMiddleware(function.CreateFunction)).
 		Methods(http.MethodPost)
 
-	router.HandleFunc("/function/{projectId}/{codeId}/build", middlewares.AuthMiddleware(function.BuildFunction)).
+	router.HandleFunc(
+		"/function/{projectId}/{codeId}/build",
+		middlewares.AuthMiddleware(function.BuildFunction),
+	).
 		Methods(http.MethodPost)
 
 	// list functions created by the user
@@ -91,7 +94,7 @@ func main() {
 		Methods(http.MethodGet)
 
 	// update function
-	router.HandleFunc("/function/{projectId}/{codeId}/", middlewares.AuthMiddleware(function.UpdateFunction)).
+	router.HandleFunc("/function/{projectId}/{codeId}", middlewares.AuthMiddleware(function.UpdateFunction)).
 		Methods(http.MethodPatch)
 
 	// delete function
@@ -103,7 +106,7 @@ func main() {
 		Methods(http.MethodGet)
 
 	// Get logs of a function
-	router.HandleFunc("/function/{projectId}/{codeId}/logs", middlewares.AuthMiddleware(function.GetFunctionLogs)).
+	router.HandleFunc("/logs/{codeId}/logs", function.GetFunctionLogs).
 		Methods(http.MethodGet)
 
 	// Create function creates function image. User has to deploy/redeploy for deployments to take effect.

@@ -183,6 +183,16 @@ func (fs *FunctionService) DeployFunction(
 	if err != nil {
 		return err
 	}
+	// fmt.Println("Creating hpa")
+	// _, err = kw.CreateHPA(&kuberneteswrapper.HPAOptions{
+	// 	Ctx:        ctx,
+	// 	Namespace:  namespace,
+	// 	FunctionId: functionId,
+	// })
+	// if err != nil {
+	// 	return err
+	// }
+	// fmt.Println("created hpa")
 	return nil
 }
 

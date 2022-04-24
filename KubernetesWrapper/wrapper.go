@@ -13,7 +13,9 @@ import (
 
 	// appsv1 "k8s.io/api/core/v1"
 	v1 "k8s.io/api/apps/v1"
+	"k8s.io/api/autoscaling/v2beta2"
 	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/selection"
@@ -41,6 +43,12 @@ type DeploymentOptions struct {
 	DeploymentLabel map[string]string
 	ImageName       string
 	Replicas        int32
+}
+
+type HPAOptions struct {
+	Ctx        context.Context
+	Namespace  string
+	FunctionId string
 }
 
 type ServiceOptions struct {
@@ -193,6 +201,41 @@ func (kw *KubernetesWrapper) CreateNamespace(
 
 }
 
+func (kw *KubernetesWrapper) CreateHPA(
+	options *HPAOptions,
+) (*v2beta2.HorizontalPodAutoscaler, error) {
+
+	averageUtilization := int32(50)
+
+	return kw.KClient.AutoscalingV2beta2().
+		HorizontalPodAutoscalers(options.Namespace).
+		Create(options.Ctx, &v2beta2.HorizontalPodAutoscaler{
+			TypeMeta: metav1.TypeMeta{
+				Kind:       "HorizontalPodAutoscaler",
+				APIVersion: "autoscaling/v2beta1",
+			}, ObjectMeta: metav1.ObjectMeta{
+				Name: "serverless-" + options.FunctionId + "-hpa",
+			},
+			Spec: v2beta2.HorizontalPodAutoscalerSpec{
+				ScaleTargetRef: v2beta2.CrossVersionObjectReference{
+					Kind:       "Deployment",
+					Name:       options.FunctionId,
+					APIVersion: "apps/v1",
+				},
+				MaxReplicas: 3,
+
+				Metrics: []v2beta2.MetricSpec{
+					{
+						Resource: &v2beta2.ResourceMetricSource{
+							Name: corev1.ResourceCPU, Target: v2beta2.MetricTarget{
+								Type:               v2beta2.UtilizationMetricType,
+								AverageUtilization: &averageUtilization,
+							},
+						},
+						Type: v2beta2.MetricSourceType("Resource"),
+					}}}}, metav1.CreateOptions{})
+}
+
 func (kw *KubernetesWrapper) CreateDeployment(options *DeploymentOptions) (*v1.Deployment, error) {
 	return kw.KClient.AppsV1().
 		Deployments(options.Namespace).
@@ -219,6 +262,11 @@ func (kw *KubernetesWrapper) CreateDeployment(options *DeploymentOptions) (*v1.D
 								Name:  options.FunctionId,
 								Image: options.ImageName, // "image name from db", // should be ghcr.io/projectname/codeId:latest
 								Ports: []corev1.ContainerPort{{ContainerPort: 3000}},
+								Resources: corev1.ResourceRequirements{
+									Requests: corev1.ResourceList{
+										corev1.ResourceCPU: resource.MustParse("250m"),
+									},
+								},
 							}},
 							ImagePullSecrets: []corev1.LocalObjectReference{{Name: "regcred"}},
 						},

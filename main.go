@@ -5,22 +5,27 @@ import (
 	"fmt"
 	"log"
 	"net/http"
+	"net/http/httputil"
+	"net/url"
 	"os"
 	"os/signal"
+	"strings"
 	"syscall"
 	"time"
-
-	"github.com/gorilla/mux"
-	"github.com/joho/godotenv"
-	"gorm.io/driver/postgres"
-	"gorm.io/gorm"
-	"k8s.io/client-go/kubernetes"
-	"k8s.io/client-go/rest"
 
 	"github.com/Cloudbase-Project/serverless/handlers"
 	"github.com/Cloudbase-Project/serverless/middlewares"
 	"github.com/Cloudbase-Project/serverless/models"
 	"github.com/Cloudbase-Project/serverless/services"
+	"github.com/gorilla/mux"
+	"github.com/joho/godotenv"
+	"github.com/prometheus/client_golang/prometheus"
+	"github.com/prometheus/client_golang/prometheus/promauto"
+	"github.com/prometheus/client_golang/prometheus/promhttp"
+	"gorm.io/driver/postgres"
+	"gorm.io/gorm"
+	"k8s.io/client-go/kubernetes"
+	"k8s.io/client-go/rest"
 )
 
 func main() {
@@ -70,6 +75,10 @@ func main() {
 
 	}
 
+	RequestCounter := promauto.NewCounter(
+		prometheus.CounterOpts{Name: "serverless_requests_total"},
+	)
+
 	db.AutoMigrate(&models.Function{}, &models.Config{})
 
 	fs := services.NewFunctionService(db, logger)
@@ -78,7 +87,7 @@ func main() {
 
 	function := handlers.NewFunctionHandler(clientset, logger, fs)
 	configHandler := handlers.NewConfigHandler(logger, cs)
-	proxyHandler := handlers.NewProxyHandler(logger, ps)
+	// proxyHandler := handlers.NewProxyHandler(logger, ps)
 	// add function
 	router.HandleFunc("/function/{projectId}", middlewares.AuthMiddleware(function.CreateFunction)).
 		Methods(http.MethodPost)
@@ -119,7 +128,58 @@ func main() {
 		// ------------------ CONFIG ROUTES
 	router.HandleFunc("/config/", configHandler.CreateConfig).Methods(http.MethodPost)
 
-	router.HandleFunc("/serve/{functionId}", proxyHandler.ProxyRequest).Methods(http.MethodGet)
+	router.HandleFunc("/serve/{functionId}", func(rw http.ResponseWriter, r *http.Request) {
+		vars := mux.Vars(r)
+
+		functionId := vars["functionId"]
+
+		function, err := ps.VerifyFunction(functionId)
+		if err != nil {
+			http.Error(rw, err.Error(), 400)
+		}
+
+		fmt.Printf("function: %v\n", function)
+
+		urlString := r.URL.String()
+		fmt.Printf("urlString: %v\n", urlString)
+		x := strings.Split(urlString, "/serve/"+functionId)
+		fmt.Println("xxxx : ", x)
+
+		functionURL := "http://cloudbase-serverless-" + functionId + "-srv:4000" + x[0]
+		fmt.Printf("functionURL: %v\n", functionURL)
+
+		finalURL, err := url.Parse(functionURL)
+		fmt.Printf("finalURL: %v\n", finalURL)
+		if err != nil {
+			http.Error(rw, err.Error(), 400)
+		}
+		fmt.Println("this")
+		resp, err := http.Get(functionURL)
+		fmt.Printf("resp: %v\n", resp)
+		// RequestCounter.With(prometheus.Labels{"function": functionId}).Inc()
+		RequestCounter.Inc()
+		// c, err := RequestCounter.GetMetricWith(prometheus.Labels{"function": functionId})
+
+		// fmt.Printf("c.Desc().String(): %v\n", c.Desc().String())
+
+		proxy := httputil.NewSingleHostReverseProxy(finalURL)
+		r.URL.Host = finalURL.Host
+		r.URL.Scheme = finalURL.Scheme
+		r.Header.Set("X-Forwarded-Host", r.Header.Get("Host"))
+		r.Host = finalURL.Host
+		r.URL.Path = finalURL.Path
+		r.URL.RawPath = finalURL.RawPath
+		proxy.ServeHTTP(rw, r)
+		fmt.Println("after")
+
+		// http://backend.cloudbase.dev/deploy/asdadjpiqwjdpqidjp/qwwe?123=qwe -> proxy to -> http://cloudbase-serverless-asdadjpiqwjdpqidjp-srv:4000qwwe?123=qwe
+
+	}).Methods(http.MethodGet)
+
+	router.HandleFunc("/testing", func(w http.ResponseWriter, r *http.Request) {
+		// RequestCounter.
+	})
+	router.Handle("/metrics", promhttp.Handler())
 
 	server := http.Server{
 		Addr:    ":" + PORT,

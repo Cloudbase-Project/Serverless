@@ -31,29 +31,20 @@ func (p *ProxyHandler) ProxyRequest(rw http.ResponseWriter, r *http.Request) {
 
 	functionId := vars["functionId"]
 
-	function, err := p.service.VerifyFunction(functionId)
+	_, err := p.service.VerifyFunction(functionId)
 	if err != nil {
 		http.Error(rw, err.Error(), 400)
 	}
-
-	fmt.Printf("function: %v\n", function)
 
 	urlString := r.URL.String()
-	fmt.Printf("urlString: %v\n", urlString)
 	x := strings.Split(urlString, "/serve/"+functionId)
-	fmt.Println("xxxx : ", x)
 
 	functionURL := "http://cloudbase-serverless-" + functionId + "-srv:4000" + x[0]
-	fmt.Printf("functionURL: %v\n", functionURL)
 
 	finalURL, err := url.Parse(functionURL)
-	fmt.Printf("finalURL: %v\n", finalURL)
 	if err != nil {
 		http.Error(rw, err.Error(), 400)
 	}
-	fmt.Println("this")
-	resp, err := http.Get(functionURL)
-	fmt.Printf("resp: %v\n", resp)
 
 	proxy := httputil.NewSingleHostReverseProxy(finalURL)
 	r.URL.Host = finalURL.Host

@@ -205,7 +205,7 @@ func (kw *KubernetesWrapper) CreateHPA(
 	options *HPAOptions,
 ) (*v2beta2.HorizontalPodAutoscaler, error) {
 
-	averageUtilization := int32(50)
+	averageUtilization := int32(15)
 
 	return kw.KClient.AutoscalingV2beta2().
 		HorizontalPodAutoscalers(options.Namespace).

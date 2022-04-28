@@ -1,21 +1,21 @@
-apiVersion: monitoring.coreos.com/v1
-kind: ServiceMonitor
-metadata:
-    name: cloudbase-serverless-svc
-    namespace: default
-    labels:
-        app: cloudbase-serverless-depl
-        tier: application
-spec:
-    selector:
-        matchLabels:
-            app: cloudbase-serverless-depl
-            tier: application
-    targetLabels:
-        - app
-        - tier
-    endpoints:
-        - port: web
-    namespaceSelector:
-        matchNames:
-            - default
+# apiVersion: monitoring.coreos.com/v1
+# kind: ServiceMonitor
+# metadata:
+#     name: cloudbase-serverless-svc
+#     namespace: default
+#     labels:
+#         app: cloudbase-serverless-depl
+#         tier: application
+# spec:
+#     selector:
+#         matchLabels:
+#             app: cloudbase-serverless-depl
+#             tier: application
+#     targetLabels:
+#         - app
+#         - tier
+#     endpoints:
+#         - port: web
+#     namespaceSelector:
+#         matchNames:
+#             - default

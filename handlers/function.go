@@ -117,13 +117,11 @@ func (f *FunctionHandler) UpdateFunction(rw http.ResponseWriter, r *http.Request
 
 	result := f.service.WatchImageBuilder(f.kw, function, constants.Namespace)
 	if result.Err != nil {
-		// http.Error(rw, "Error watching image builder", 500)
 		f.l.Print("error watching image builder", result.Err)
 	}
 
 	function.BuildFailReason = result.Reason
 	function.BuildStatus = result.Status
-	// TODO: Should Come back to this. maybe have to add lastAction  = update
 	function.LastAction = string(constants.UpdateAction)
 	function.DeployStatus = string(constants.RedeployRequired)
 	f.service.SaveFunction(function)
@@ -145,7 +143,6 @@ func (f *FunctionHandler) DeleteFunction(rw http.ResponseWriter, r *http.Request
 		f.l.Print(err)
 		http.Error(rw, "DB error", 500)
 	}
-	// TODO: delete resources
 	serviceName := utils.BuildServiceName(codeId)
 
 	err = f.service.DeleteFunctionResources(
@@ -159,30 +156,16 @@ func (f *FunctionHandler) DeleteFunction(rw http.ResponseWriter, r *http.Request
 		f.l.Print(err)
 		http.Error(rw, "Err deleting resources", 500)
 	}
-	// TODO: Remove from router
 }
 
 func (f *FunctionHandler) GetFunctionLogs(rw http.ResponseWriter, r *http.Request) {
 	vars := mux.Vars(r)
-	fmt.Println("hello from the logs function")
-	// ownerId := r.Context().Value("ownerId").(string)
 
-	// projectId := vars["projectId"]
-
-	// get function
-	// function, err := f.service.GetFunction(vars["codeId"], ownerId, projectId)
-	// if err != nil {
-	// 	http.Error(rw, "Error getting function, "+err.Error(), 400)
-	// }
-
-	// if function.DeployStatus == string(constants.Deployed) &&
-	// function.LastAction == string(constants.DeployAction) {
 	// get the logs for the given function
 	err := f.service.GetDeploymentLogs(
 		f.kw,
 		r.Context(),
 		constants.Namespace,
-		// function.ID.String(),
 		vars["codeId"],
 		true,
 		rw,
@@ -195,12 +178,6 @@ func (f *FunctionHandler) GetFunctionLogs(rw http.ResponseWriter, r *http.Reques
 		f.Flush()
 	}
 
-	// } else {
-	// 	http.Error(rw, "Cannot perform this action currently", 400)
-	// }
-	// check if its deployStatus is deployed
-	// check if lastAction is deploy
-	// check if
 }
 
 /*
@@ -228,7 +205,6 @@ func (f *FunctionHandler) DeployFunction(rw http.ResponseWriter, r *http.Request
 
 		deploymentLabel := map[string]string{"app": function.ID.String()}
 
-		// TODO: Should change to constant
 		replicas := int32(1)
 
 		imageName := utils.BuildImageName(function.ID.String())
@@ -252,7 +228,6 @@ func (f *FunctionHandler) DeployFunction(rw http.ResponseWriter, r *http.Request
 		function.DeployStatus = string(constants.Deploying)
 		f.service.SaveFunction(function)
 
-		// rw.Write([]byte("Deploying your function..."))
 		rw = utils.SetSSEHeaders(rw)
 		fmt.Fprintf(rw, "data: %v\n\n", "Deploying your function...")
 
@@ -273,31 +248,15 @@ func (f *FunctionHandler) DeployFunction(rw http.ResponseWriter, r *http.Request
 		function.LastAction = string(constants.DeployAction)
 		f.service.SaveFunction(function)
 
-		// TODO: register with the custom router
 		fmt.Fprintf(rw, "data: %v\n\n", "Deployed your function successfully")
 
 	} else {
 		http.Error(rw, "Cannot perform this action currently", 400)
 	}
 
-	// if function.LastAction == string(constants.UpdateAction) ||
-	// 	function.LastAction == string(constants.DeployAction) {
-	// 	http.Error(rw, "Function Already deployed or must be redeployed", 400)
-	// }
-
-	// // check if status is complete and only then try to deploy
-	// if (function.BuildStatus == string(constants.BuildFailed)) ||
-	// 	(function.DeployStatus == string(constants.RedeployRequired)) ||
-	// 	(function.DeployStatus == string(constants.Deployed)) ||
-	// 	(function.LastAction == string(constants.UpdateAction)) {
-	// 	http.Error(rw, "Cannot perform this action currently.", 400)
-	// 	return
-	// }
-
 }
 
 func (f *FunctionHandler) BuildFunction(rw http.ResponseWriter, r *http.Request) {
-	fmt.Println("in the function correctly : ")
 	var data *dtos.BuildFunctionDTO
 	utils.FromJSON(r.Body, &data)
 	if _, err := dtos.Validate(data); err != nil {
@@ -327,14 +286,10 @@ func (f *FunctionHandler) BuildFunction(rw http.ResponseWriter, r *http.Request)
 	Project := os.Getenv("PROJECT_NAME")
 
 	imageName := Registry + "/" + Project + "/" + function.ID.String() + ":latest"
-	// imageName := Registry + "/" + Project + "/" + "test1" + ":latest"
-	fmt.Printf("imageName: %v\n", imageName)
-	// _, err := f.kw.CreateNamespace(r.Context(), constants.Namespace)
 
 	// create namespace if not exist
 	if err != nil {
 		// namespace already exists. ignore
-		fmt.Println("namespace already exists. ignoring...")
 		fmt.Printf("err: %v\n", err)
 	}
 
@@ -351,14 +306,11 @@ func (f *FunctionHandler) BuildFunction(rw http.ResponseWriter, r *http.Request)
 		})
 
 	if err != nil {
-		http.Error(rw, "erroror : "+err.Error(), 400)
+		http.Error(rw, "error : "+err.Error(), 400)
 	}
-
-	// podLogs = clientset.CoreV1().Pods("serverless").GetLogs("kaniko-worker", &v1.PodLogOptions{})
 
 	rw = utils.SetSSEHeaders(rw)
 
-	// rw.Write([]byte("Building Image for your code"))
 	fmt.Fprintf(rw, "data: %v\n\n", "Building Image for your code")
 
 	if f, ok := rw.(http.Flusher); ok {
@@ -368,7 +320,6 @@ func (f *FunctionHandler) BuildFunction(rw http.ResponseWriter, r *http.Request)
 	result := f.service.WatchImageBuilder(f.kw, function, constants.Namespace)
 	if result.Err != nil {
 		http.Error(rw, "Error watching image builder", 500)
-		fmt.Println("err : ", result.Err.Error())
 	}
 
 	err = f.service.DeleteImageBuilder(f.kw, r.Context(), constants.Namespace)
@@ -410,9 +361,6 @@ func (f *FunctionHandler) CreateFunction(rw http.ResponseWriter, r *http.Request
 	}
 	fmt.Printf("function: %v\n", function)
 
-	// if err != nil {
-	// 	http.Error(rw, "cannot read json", 400)
-	// }
 	function.ToJSON(rw)
 }
 

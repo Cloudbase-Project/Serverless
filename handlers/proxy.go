@@ -1,7 +1,6 @@
 package handlers
 
 import (
-	"fmt"
 	"log"
 	"net/http"
 	"net/http/httputil"
@@ -54,8 +53,5 @@ func (p *ProxyHandler) ProxyRequest(rw http.ResponseWriter, r *http.Request) {
 	r.URL.Path = finalURL.Path
 	r.URL.RawPath = finalURL.RawPath
 	proxy.ServeHTTP(rw, r)
-	fmt.Println("after")
-
-	// http://backend.cloudbase.dev/deploy/asdadjpiqwjdpqidjp/qwwe?123=qwe -> proxy to -> http://cloudbase-serverless-asdadjpiqwjdpqidjp-srv:4000qwwe?123=qwe
 
 }

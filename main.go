@@ -133,17 +133,14 @@ func main() {
 
 		functionId := vars["functionId"]
 
-		function, err := ps.VerifyFunction(functionId)
+		_, err := ps.VerifyFunction(functionId)
 		if err != nil {
 			http.Error(rw, err.Error(), 400)
 		}
 
-		fmt.Printf("function: %v\n", function)
-
 		urlString := r.URL.String()
 		fmt.Printf("urlString: %v\n", urlString)
 		x := strings.Split(urlString, "/serve/"+functionId)
-		fmt.Println("xxxx : ", x)
 
 		functionURL := "http://cloudbase-serverless-" + functionId + "-srv:4000" + x[0]
 		fmt.Printf("functionURL: %v\n", functionURL)
@@ -153,14 +150,8 @@ func main() {
 		if err != nil {
 			http.Error(rw, err.Error(), 400)
 		}
-		fmt.Println("this")
-		resp, err := http.Get(functionURL)
-		fmt.Printf("resp: %v\n", resp)
-		// RequestCounter.With(prometheus.Labels{"function": functionId}).Inc()
+		_, err = http.Get(functionURL)
 		RequestCounter.Inc()
-		// c, err := RequestCounter.GetMetricWith(prometheus.Labels{"function": functionId})
-
-		// fmt.Printf("c.Desc().String(): %v\n", c.Desc().String())
 
 		proxy := httputil.NewSingleHostReverseProxy(finalURL)
 		r.URL.Host = finalURL.Host
@@ -170,14 +161,12 @@ func main() {
 		r.URL.Path = finalURL.Path
 		r.URL.RawPath = finalURL.RawPath
 		proxy.ServeHTTP(rw, r)
-		fmt.Println("after")
 
 		// http://backend.cloudbase.dev/deploy/asdadjpiqwjdpqidjp/qwwe?123=qwe -> proxy to -> http://cloudbase-serverless-asdadjpiqwjdpqidjp-srv:4000qwwe?123=qwe
 
 	}).Methods(http.MethodGet)
 
 	router.HandleFunc("/testing", func(w http.ResponseWriter, r *http.Request) {
-		// RequestCounter.
 	})
 	router.Handle("/metrics", promhttp.Handler())
 

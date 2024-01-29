@@ -15,16 +15,13 @@ func AuthMiddleware(
 ) func(http.ResponseWriter, *http.Request) {
 	return http.HandlerFunc(func(rw http.ResponseWriter, r *http.Request) {
 
-		fmt.Println("hello from the auth middleware")
 		token := r.Header.Get("owner")
 		if token == "" {
-			// http.Error(rw, "Token missing", 40s1)
 			rw.Header().Set("Content-Type", "application/json")
 			rw.WriteHeader(401)
 			json.NewEncoder(rw).Encode(map[string]string{"message": "token missing"})
 			return
 		}
-		fmt.Printf("token: %v\n", token)
 
 		tokenData, err := jwt.Parse(
 			token,

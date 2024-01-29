@@ -43,7 +43,6 @@ func (fs *FunctionService) GetAllFunctions(
 
 	var functions models.Functions
 	var config models.Config
-	// result := fs.db.Where("owner = ? AND projectId = ?", ownerId, projectId).First(&config)
 	result := fs.db.Where(&models.Config{Owner: ownerId, ProjectId: projectId}).First(&config)
 
 	if errors.Is(result.Error, gorm.ErrRecordNotFound) {
@@ -68,7 +67,6 @@ func (fs *FunctionService) GetFunction(
 	var function models.Function
 	var config models.Config
 
-	// result := fs.db.Where("owner = ? AND projectId = ?", ownerId, projectId).First(&config)
 	result := fs.db.Where(&models.Config{Owner: ownerId, ProjectId: projectId}).First(&config)
 
 	if errors.Is(result.Error, gorm.ErrRecordNotFound) {
@@ -102,7 +100,6 @@ func (fs *FunctionService) CreateFunction(
 	fmt.Printf("configs.owner: %v\n", configs[0].Owner)
 	fmt.Printf("configs.projectid: %v\n", configs[0].ProjectId)
 
-	// result := fs.db.Where("owner = ?", ownerId, projectId).First(&config)
 	result := fs.db.Where(&models.Config{Owner: ownerId, ProjectId: projectId}).First(&config)
 
 	if errors.Is(result.Error, gorm.ErrRecordNotFound) {
@@ -113,13 +110,9 @@ func (fs *FunctionService) CreateFunction(
 	}
 
 	function := models.Function{Config: config}
-	// if err := fs.db.Create(&models.Function{Code: code, Language: string(language), UserId: userId, BuildStatus: string(constants.Building)}).Error; err != nil {
-	// 	return nil, err
-	// }
 
 	fs.db.Create(&function)
 
-	fmt.Printf("result: %v\n", &result)
 	return &function, nil
 }
 
@@ -183,7 +176,6 @@ func (fs *FunctionService) DeployFunction(
 	if err != nil {
 		return err
 	}
-	fmt.Println("Creating hpa")
 	_, err = kw.CreateHPA(&kuberneteswrapper.HPAOptions{
 		Ctx:        ctx,
 		Namespace:  namespace,
@@ -192,7 +184,6 @@ func (fs *FunctionService) DeployFunction(
 	if err != nil {
 		return err
 	}
-	fmt.Println("created hpa")
 	return nil
 }
 
@@ -201,8 +192,7 @@ func (fs *FunctionService) WatchDeployment(
 	function *models.Function,
 	namespace string,
 ) WatchResult {
-	watchContext, cancelFunc := context.WithTimeout(context.Background(), 30*time.Second)
-	defer cancelFunc()
+	watchContext := context.Background()
 
 	label, _ := kw.BuildLabel("app", []string{function.ID.String()}) // TODO:
 	deploymentWatch, err := kw.GetDeploymentWatcher(
@@ -220,7 +210,6 @@ func (fs *FunctionService) WatchDeployment(
 		for event := range deploymentWatch.ResultChan() {
 			p, ok := event.Object.(*appsv1.Deployment)
 			if !ok {
-				fmt.Println("unexpected type")
 				continue
 			}
 			fmt.Printf("p: %v\n", p)
@@ -291,7 +280,6 @@ func (fs *FunctionService) WatchImageBuilder(
 			switch p.Status.Phase {
 			case corev1.PodSucceeded:
 				// TODO: Commit status to DB
-				fmt.Println("image build success. pushed to db")
 				dataChan <- WatchResult{Status: string(constants.BuildSuccess), Reason: p.Status.Message, Err: nil}
 				podWatch.Stop()
 				break
@@ -361,10 +349,6 @@ func (fs *FunctionService) GetDeploymentLogs(
 		Pods(namespace).
 		List(ctx, metav1.ListOptions{LabelSelector: label.String()})
 
-	// req := kw.KClient.CoreV1().Pods(namespace).
-	// 	// GetLogs("deployment/"+deploymentName, &v1.PodLogOptions{Follow: follow})
-	// 	GetLogs("fa1f1dbf-aff3-424c-848a-68303a541ad3-7c94c475d9-l2652", &v1.PodLogOptions{Follow: false})
-
 	var requests []struct {
 		Request *rest.Request
 		PodName string
@@ -413,8 +397,6 @@ func (fs *FunctionService) GetDeploymentLogs(
 		}(request.Request, request.PodName)
 	}
 	wg.Wait()
-	// podLogs, err := req.Stream(ctx)
-	// l := req.Do(ctx)
 	return err
 }
 

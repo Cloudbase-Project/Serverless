@@ -1,7 +1,6 @@
 package services
 
 import (
-	"fmt"
 	"log"
 
 	"github.com/Cloudbase-Project/serverless/dtos"
@@ -26,8 +25,7 @@ func (cs *ConfigService) CreateConfig(
 		ProjectId: CreateConfigDTO.ProjectId,
 		Enabled:   true,
 	}
-	result := cs.db.Create(&config)
-	fmt.Printf("config created: %v\n", &result)
+	_ := cs.db.Create(&config)
 	return &config
 }
 
